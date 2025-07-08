@@ -1,13 +1,46 @@
 'use client';
 
 import Image from "next/image";
+import Link from "next/link";
 import AnimatedSection from "../components/AnimatedSection";
 import Carousel from "../components/Carousel";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { isAuthenticated, fetchUserProfile, getStoredUserProfile, logout, UserProfile } from "../utils/auth";
 
 export default function Home() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [showBubble, setShowBubble] = useState(true);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // Check authentication status and fetch user profile on component mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      if (isAuthenticated()) {
+        setIsLoggedIn(true);
+
+        // Try to get stored profile first
+        let profile = getStoredUserProfile();
+
+        if (!profile) {
+          // If no stored profile, fetch from API
+          profile = await fetchUserProfile();
+        }
+
+        if (profile) {
+          setUserProfile(profile);
+        }
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    setIsLoggedIn(false);
+    setUserProfile(null);
+  };
 
   const toggleChat = () => {
     setIsChatOpen(!isChatOpen);
@@ -38,6 +71,26 @@ export default function Home() {
               <a href="#tuition" className="text-gray-700 hover:text-[#ff6b35] px-3 py-2 text-sm font-medium">
                 Học phí
               </a>
+
+              {/* Authentication Section */}
+              {isLoggedIn && userProfile ? (
+                <div className="flex items-center space-x-4">
+                  <span className="text-[#ff6b35] font-medium text-sm">
+                    Xin chào {userProfile.firstName} {userProfile.lastName}!
+                  </span>
+                  <button
+                    onClick={handleLogout}
+                    className="text-gray-700 hover:text-[#ff6b35] px-3 py-2 text-sm font-medium"
+                  >
+                    Đăng xuất
+                  </button>
+                </div>
+              ) : (
+                <Link href="/login" className="text-gray-700 hover:text-[#ff6b35] px-3 py-2 text-sm font-medium">
+                  Đăng nhập
+                </Link>
+              )}
+
               <a href="#contact" className="bg-[#ff6b35] text-white px-4 py-2 rounded-lg hover:bg-[#ff8c42] transition-colors">
                 Tư vấn
               </a>
