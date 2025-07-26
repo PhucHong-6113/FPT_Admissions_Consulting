@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import AnimatedSection from "../components/AnimatedSection";
 import Carousel from "../components/Carousel";
-import { useState, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { isAuthenticated, fetchUserProfile, getStoredUserProfile, logout, UserProfile } from "../utils/auth";
 import { useRouter } from 'next/navigation';
 import {SERVICE_URLS} from '../utils/services';
@@ -12,6 +12,96 @@ import {SERVICE_URLS} from '../utils/services';
 export default function Home() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [showBubble, setShowBubble] = useState(true);
+  const [messages, setMessages] = useState<Array<{id: string, text: string, isUser: boolean, timestamp: Date, serverTime?: string}>>([]);
+  const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Default questions for first-time users
+  const defaultQuestions = [
+    "FPT có bao nhiều ki? và học phí mỗi kì là bao nhiêu?",
+    "Những ngành học nào tại FPT University?",
+    "Điều kiện tuyển sinh của FPT là gì?",
+    "Cơ sở vật chất và môi trường học tập tại FPT như thế nào?",
+    "Chính sách học bổng tại FPT University?"
+  ];
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const sendMessage = async (messageText: string) => {
+    if (!messageText.trim() || isLoading) return;
+
+    const userMessage = {
+      id: Date.now().toString(),
+      text: messageText,
+      isUser: true,
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInputValue('');
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_LOCAL_BASE_URL}/api/chatbot`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          question: messageText
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      const botMessage = {
+        id: (Date.now() + 1).toString(),
+        text: data.answer,
+        isUser: false,
+        timestamp: new Date(),
+        serverTime: data.text_time
+      };
+
+      setMessages(prev => [...prev, botMessage]);
+    } catch (error) {
+      console.error('Error calling chatbot API:', error);
+      const errorMessage = {
+        id: (Date.now() + 1).toString(),
+        text: 'Xin lỗi, có lỗi kết nối. Vui lòng thử lại sau.',
+        isUser: false,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleInputSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    sendMessage(inputValue);
+  };
+
+  const handleDefaultQuestion = (question: string) => {
+    sendMessage(question);
+  };
+
+  const refreshChat = () => {
+    setMessages([]);
+    setInputValue('');
+    setIsLoading(false);
+  };
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const router = useRouter();
@@ -138,7 +228,7 @@ export default function Home() {
               <AnimatedSection animation="slideLeft" delay={300}>
                 <div>
                   <h1 className="text-4xl lg:text-6xl font-bold text-gray-900 mb-6">
-                    Chào mừng đến với 
+                    Chào mừng đến với kênh tuyển sinh
                     <span className="text-[#ff6b35] block">FPT University</span>
                   </h1>
                   <p className="text-xl text-gray-600 mb-8 leading-relaxed">
@@ -655,66 +745,153 @@ export default function Home() {
                   <div className="text-xs opacity-90">Trợ lý tư vấn</div>
                 </div>
               </div>
-              <button 
-                onClick={toggleChat}
-                className="text-white hover:text-gray-200"
-              >
-                ×
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={refreshChat}
+                  className="text-white hover:text-gray-200 p-1"
+                  title="Làm mới cuộc trò chuyện"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+                <button
+                  onClick={toggleChat}
+                  className="text-white hover:text-gray-200"
+                >
+                  ×
+                </button>
+              </div>
             </div>
 
             {/* Chat Messages */}
             <div className="h-64 p-4 overflow-y-auto bg-gray-50">
-              {/* Welcome Message */}
-              <div className="mb-4">
-                <div className="flex items-start">
-                  <Image src="/logo.png" alt="FPT.AI" width={20} height={20} className="mr-2 mt-1" />
-                  <div className="bg-white rounded-lg p-3 shadow-sm max-w-xs">
-                    <div className="text-sm text-gray-700">
-                      Xin chào! Tôi là FPT.AI, trợ lý tư vấn tuyển sinh của FPT University. 
-                      Tôi có thể giúp bạn tìm hiểu về:
-                    </div>
-                    <div className="mt-2 text-xs text-gray-600">
-                      • Chương trình đào tạo
-                      <br />• Học phí và học bổng
-                      <br />• Thủ tục tuyển sinh
-                      <br />• Cơ sở vật chất
+              {messages.length === 0 ? (
+                <>
+                  {/* Welcome Message */}
+                  <div className="mb-4">
+                    <div className="flex items-start">
+                      <div className="w-6 h-6 bg-white rounded-full border border-gray-200 flex items-center justify-center overflow-hidden mr-2 flex-shrink-0">
+                        <Image src="/logo.png" alt="FPT.AI" width={16} height={16} className="object-cover" />
+                      </div>
+                      <div className="bg-white rounded-lg p-3 shadow-sm max-w-xs">
+                        <div className="text-xs text-gray-500 mb-1">
+                          {new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </div>
+                        <div className="text-sm text-gray-700">
+                          Xin chào! Tôi là FPT.AI, trợ lý tư vấn tuyển sinh của FPT University.
+                          Tôi có thể giúp bạn tìm hiểu về chương trình đào tạo, học phí, thủ tục tuyển sinh và nhiều thông tin khác.
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
 
-              {/* Quick Actions */}
-              <div className="space-y-2">
-                <button className="w-full text-left bg-white border border-gray-200 rounded-lg p-2 hover:bg-gray-50 text-sm">
-                  🎓 Tìm hiểu chương trình học
-                </button>
-                <button className="w-full text-left bg-white border border-gray-200 rounded-lg p-2 hover:bg-gray-50 text-sm">
-                  💰 Thông tin học phí
-                </button>
-                <button className="w-full text-left bg-white border border-gray-200 rounded-lg p-2 hover:bg-gray-50 text-sm">
-                  📋 Thủ tục tuyển sinh
-                </button>
-                <button className="w-full text-left bg-white border border-gray-200 rounded-lg p-2 hover:bg-gray-50 text-sm">
-                  🏢 Tham quan campus
-                </button>
-              </div>
+                  {/* Default Questions */}
+                  <div className="space-y-2">
+                    <div className="text-xs text-gray-500 mb-2 text-center">Một số câu hỏi thường gặp:</div>
+                    {defaultQuestions.map((question, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleDefaultQuestion(question)}
+                        className="w-full text-left bg-white border border-gray-200 rounded-lg p-2 hover:bg-[#fff5f2] hover:border-[#ff6b35] text-sm transition-colors"
+                      >
+                        {question}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Messages */}
+                  {messages.map((message) => (
+                    <div key={message.id} className={`mb-4 flex ${message.isUser ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`flex items-start max-w-xs ${message.isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+                        {/* Avatar */}
+                        <div className={`flex-shrink-0 ${message.isUser ? 'ml-2' : 'mr-2'}`}>
+                          {message.isUser ? (
+                            <div className="w-6 h-6 bg-[#ff6b35] rounded-full flex items-center justify-center">
+                              <span className="text-white text-xs font-semibold">U</span>
+                            </div>
+                          ) : (
+                            <div className="w-6 h-6 bg-white rounded-full border border-gray-200 flex items-center justify-center overflow-hidden">
+                              <Image src="/logo.png" alt="FPT.AI" width={16} height={16} className="object-cover" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Message Content */}
+                        <div className={`rounded-lg p-3 shadow-sm ${
+                          message.isUser 
+                            ? 'bg-[#ff6b35] text-white' 
+                            : 'bg-white text-gray-700'
+                        }`}>
+                          {/* Time at the top */}
+                          <div className={`text-xs mb-1 ${message.isUser ? 'text-orange-100' : 'text-gray-500'}`}>
+                            {message.isUser
+                              ? message.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                              : message.serverTime
+                                ? new Date(message.serverTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                                : message.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                            }
+                          </div>
+                          {/* Message text */}
+                          <div className="text-sm whitespace-pre-wrap">{message.text}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Loading indicator */}
+                  {isLoading && (
+                    <div className="mb-4 flex justify-start">
+                      <div className="flex items-start">
+                        {/* Bot Avatar */}
+                        <div className="w-6 h-6 bg-white rounded-full border border-gray-200 flex items-center justify-center overflow-hidden mr-2 flex-shrink-0">
+                          <Image src="/logo.png" alt="FPT.AI" width={16} height={16} className="object-cover" />
+                        </div>
+
+                        <div className="bg-white rounded-lg p-3 shadow-sm">
+                          <div className="text-xs text-gray-500 mb-1">Đang trả lời...</div>
+                          <div className="flex space-x-1">
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div ref={messagesEndRef} />
+                </>
+              )}
             </div>
 
             {/* Chat Input */}
             <div className="p-4 border-t border-gray-200">
-              <div className="flex">
+              <form onSubmit={handleInputSubmit} className="flex">
                 <input
                   type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
                   placeholder="Nhập câu hỏi của bạn..."
                   className="flex-1 border border-gray-300 rounded-l-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff6b35] focus:border-transparent"
+                  disabled={isLoading}
                 />
-                <button className="bg-[#ff6b35] text-white px-4 py-2 rounded-r-lg hover:bg-[#ff8c42] transition-colors">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                  </svg>
+                <button
+                  type="submit"
+                  disabled={isLoading || !inputValue.trim()}
+                  className="bg-[#ff6b35] text-white px-4 py-2 rounded-r-lg hover:bg-[#ff8c42] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                  )}
                 </button>
-              </div>
+              </form>
             </div>
           </div>
         )}
@@ -722,11 +899,11 @@ export default function Home() {
         {/* Chat Button */}
         <button
           onClick={toggleChat}
-          className="bg-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center group animate-bounce hover:animate-none p-2"
+          className="bg-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center group p-2"
         >
           {isChatOpen ? (
             <div className="w-16 h-16 bg-[#ff6b35] rounded-full flex items-center justify-center">
-              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </div>
@@ -736,7 +913,7 @@ export default function Home() {
               alt="FPT Chat" 
               width={64} 
               height={64}
-              className="group-hover:scale-110 transition-transform duration-300"
+              className="group-hover:scale-110 transition-transform duration-300 animate-bounce"
             />
           )}
         </button>
