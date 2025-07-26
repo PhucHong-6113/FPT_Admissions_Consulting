@@ -1,9 +1,13 @@
 'use client';
 
 import Image from "next/image";
+import Link from "next/link";
 import AnimatedSection from "../components/AnimatedSection";
 import Carousel from "../components/Carousel";
 import { useState, useRef, useEffect } from "react";
+import { isAuthenticated, fetchUserProfile, getStoredUserProfile, logout, UserProfile } from "../utils/auth";
+import { useRouter } from 'next/navigation';
+import {SERVICE_URLS} from '../utils/services';
 
 export default function Home() {
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -60,7 +64,7 @@ export default function Home() {
       }
 
       const data = await response.json();
-      
+
       const botMessage = {
         id: (Date.now() + 1).toString(),
         text: data.answer,
@@ -98,10 +102,60 @@ export default function Home() {
     setInputValue('');
     setIsLoading(false);
   };
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const router = useRouter();
+
+  // Check authentication status and fetch user profile on component mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      if (isAuthenticated()) {
+        setIsLoggedIn(true);
+        let profile = getStoredUserProfile();
+        if (!profile) {
+          // Nếu chưa có profile, fetch từ API backend
+          const fetchApi = (await import('../utils/auth')).fetchUserProfileFromApi;
+          if (fetchApi) {
+            profile = await fetchApi();
+          }
+        }
+        if (profile) {
+          setUserProfile(profile);
+        } else {
+          // Nếu không lấy được profile, coi như chưa đăng nhập
+          setIsLoggedIn(false);
+          setUserProfile(null);
+        }
+      } else {
+        setIsLoggedIn(false);
+        setUserProfile(null);
+      }
+    };
+    // Lắng nghe sự thay đổi của access_token trong localStorage
+    window.addEventListener('storage', checkAuth);
+    checkAuth();
+    return () => {
+      window.removeEventListener('storage', checkAuth);
+    };
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    setIsLoggedIn(false);
+    setUserProfile(null);
+  };
 
   const toggleChat = () => {
     setIsChatOpen(!isChatOpen);
     setShowBubble(false);
+  };
+
+  const handleAppointmentClick = () => {
+    if (isAuthenticated()) {
+      router.push('/appointment');
+    } else {
+      router.push('/login');
+    }
   };
 
   return (
@@ -128,9 +182,32 @@ export default function Home() {
               <a href="#tuition" className="text-gray-700 hover:text-[#ff6b35] px-3 py-2 text-sm font-medium">
                 Học phí
               </a>
-              <a href="#contact" className="bg-[#ff6b35] text-white px-4 py-2 rounded-lg hover:bg-[#ff8c42] transition-colors">
+
+              {/* Authentication Section */}
+              {isLoggedIn && userProfile ? (
+                <div className="flex items-center space-x-4">
+                  <span className="text-[#ff6b35] font-medium text-sm">
+                    Xin chào {userProfile.firstName} {userProfile.lastName}!
+                  </span>
+                  <button
+                    onClick={handleLogout}
+                    className="text-gray-700 hover:text-[#ff6b35] px-3 py-2 text-sm font-medium"
+                  >
+                    Đăng xuất
+                  </button>
+                </div>
+              ) : (
+                <Link href="/login" className="text-gray-700 hover:text-[#ff6b35] px-3 py-2 text-sm font-medium">
+                  Đăng nhập
+                </Link>
+              )}
+
+              <button
+                onClick={handleAppointmentClick}
+                className="bg-[#ff6b35] text-white px-4 py-2 rounded-lg hover:bg-[#ff8c42] transition-colors"
+              >
                 Tư vấn
-              </a>
+              </button>
             </div>
             <div className="md:hidden flex items-center">
               <button className="text-gray-700">
@@ -159,7 +236,10 @@ export default function Home() {
                     và kinh doanh tương lai. Với phương pháp giảng dạy tiên tiến và kết nối chặt chẽ với doanh nghiệp.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-4">
-                    <button className="bg-[#ff6b35] text-white px-8 py-4 rounded-lg hover:bg-[#ff8c42] transition-colors font-semibold text-lg">
+                    <button
+                      onClick={handleAppointmentClick}
+                      className="bg-[#ff6b35] text-white px-8 py-4 rounded-lg hover:bg-[#ff8c42] transition-colors font-semibold text-lg"
+                    >
                       Đăng ký tư vấn
                     </button>
                     <button className="border-2 border-[#ff6b35] text-[#ff6b35] px-8 py-4 rounded-lg hover:bg-[#ff6b35] hover:text-white transition-colors font-semibold text-lg">
@@ -666,7 +746,7 @@ export default function Home() {
                 </div>
               </div>
               <div className="flex items-center space-x-2">
-                <button 
+                <button
                   onClick={refreshChat}
                   className="text-white hover:text-gray-200 p-1"
                   title="Làm mới cuộc trò chuyện"
@@ -675,7 +755,7 @@ export default function Home() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
                 </button>
-                <button 
+                <button
                   onClick={toggleChat}
                   className="text-white hover:text-gray-200"
                 >
@@ -699,7 +779,7 @@ export default function Home() {
                           {new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                         </div>
                         <div className="text-sm text-gray-700">
-                          Xin chào! Tôi là FPT.AI, trợ lý tư vấn tuyển sinh của FPT University. 
+                          Xin chào! Tôi là FPT.AI, trợ lý tư vấn tuyển sinh của FPT University.
                           Tôi có thể giúp bạn tìm hiểu về chương trình đào tạo, học phí, thủ tục tuyển sinh và nhiều thông tin khác.
                         </div>
                       </div>
@@ -710,7 +790,7 @@ export default function Home() {
                   <div className="space-y-2">
                     <div className="text-xs text-gray-500 mb-2 text-center">Một số câu hỏi thường gặp:</div>
                     {defaultQuestions.map((question, index) => (
-                      <button 
+                      <button
                         key={index}
                         onClick={() => handleDefaultQuestion(question)}
                         className="w-full text-left bg-white border border-gray-200 rounded-lg p-2 hover:bg-[#fff5f2] hover:border-[#ff6b35] text-sm transition-colors"
@@ -738,7 +818,7 @@ export default function Home() {
                             </div>
                           )}
                         </div>
-                        
+
                         {/* Message Content */}
                         <div className={`rounded-lg p-3 shadow-sm ${
                           message.isUser 
@@ -747,9 +827,9 @@ export default function Home() {
                         }`}>
                           {/* Time at the top */}
                           <div className={`text-xs mb-1 ${message.isUser ? 'text-orange-100' : 'text-gray-500'}`}>
-                            {message.isUser 
+                            {message.isUser
                               ? message.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                              : message.serverTime 
+                              : message.serverTime
                                 ? new Date(message.serverTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
                                 : message.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
                             }
@@ -769,7 +849,7 @@ export default function Home() {
                         <div className="w-6 h-6 bg-white rounded-full border border-gray-200 flex items-center justify-center overflow-hidden mr-2 flex-shrink-0">
                           <Image src="/logo.png" alt="FPT.AI" width={16} height={16} className="object-cover" />
                         </div>
-                        
+
                         <div className="bg-white rounded-lg p-3 shadow-sm">
                           <div className="text-xs text-gray-500 mb-1">Đang trả lời...</div>
                           <div className="flex space-x-1">
@@ -798,7 +878,7 @@ export default function Home() {
                   className="flex-1 border border-gray-300 rounded-l-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff6b35] focus:border-transparent"
                   disabled={isLoading}
                 />
-                <button 
+                <button
                   type="submit"
                   disabled={isLoading || !inputValue.trim()}
                   className="bg-[#ff6b35] text-white px-4 py-2 rounded-r-lg hover:bg-[#ff8c42] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
