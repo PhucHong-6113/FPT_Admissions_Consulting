@@ -4,6 +4,29 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import AnimatedSection from '../../components/AnimatedSection';
+import { SERVICE_URLS } from '../../utils/services';
+
+// Define AuthTokens type
+interface AuthTokens {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  refresh_token: string;
+  scope: string;
+}
+
+// Simple storeTokens function
+function storeTokens(tokens: AuthTokens) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('access_token', tokens.access_token);
+  localStorage.setItem('token_type', tokens.token_type);
+  localStorage.setItem('expires_in', tokens.expires_in.toString());
+  localStorage.setItem('refresh_token', tokens.refresh_token);
+  localStorage.setItem('scope', tokens.scope);
+  // Optionally, store expiration time
+  const expirationTime = new Date().getTime() + (tokens.expires_in * 1000);
+  localStorage.setItem('token_expiration', expirationTime.toString());
+}
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -13,6 +36,18 @@ export default function LoginPage() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // State cho popup register
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [registerData, setRegisterData] = useState({
+    email: '',
+    password: '',
+    firstName: '',
+    lastName: ''
+  });
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [registerError, setRegisterError] = useState('');
+  const [registerSuccess, setRegisterSuccess] = useState('');
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -28,44 +63,88 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:5050/connect/Token', {
+      const tokenResponse = await fetch(`${SERVICE_URLS.AuthService}/connect/Token`, {
         method: 'POST',
         headers: {
-          'accept': 'application/json, text/plain, */*',
-          'accept-language': 'vi,en;q=0.9,en-GB;q=0.8,en-US;q=0.7',
-          'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
-          'origin': 'http://localhost:3000',
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: new URLSearchParams({
           grant_type: 'password',
-          username: 'ILoveFPT',
+          username: 'IloveFPT',
           password: formData.password,
           Email: formData.email
-        })
+        }),
       });
 
-      if (response.ok) {
-        const data = await response.json();
+      if (tokenResponse.ok) {
+        const data: AuthTokens = await tokenResponse.json();
 
-        // Store all token information
-        localStorage.setItem('access_token', data.access_token);
-        localStorage.setItem('token_type', data.token_type);
-        localStorage.setItem('expires_in', data.expires_in.toString());
-        localStorage.setItem('refresh_token', data.refresh_token);
-        localStorage.setItem('scope', data.scope);
+        // Use the enhanced token storage function that includes automatic refresh monitoring
+        storeTokens(data);
 
-        // Calculate expiration time
-        const expirationTime = new Date().getTime() + (data.expires_in * 1000);
-        localStorage.setItem('token_expiration', expirationTime.toString());
-
+        console.log('Login successful, tokens stored with auto-refresh monitoring');
         window.location.href = '/';
       } else {
-        setError('Thông tin đăng nhập không chính xác. Vui lòng thử lại.');
+        const errorData = await tokenResponse.json().catch(() => ({}));
+        setError(errorData.error_description || 'Thông tin đăng nhập không chính xác. Vui lòng thử lại.');
       }
-    } catch {
+    } catch (error) {
+      console.error('Login error:', error);
       setError('Có lỗi xảy ra. Vui lòng thử lại sau.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleRegisterInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setRegisterData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsRegistering(true);
+    setRegisterError('');
+    setRegisterSuccess('');
+
+    try {
+      const insertUserResponse = await fetch(`${SERVICE_URLS.AuthService}/api/v1/user/InsertUser`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: registerData.email,
+          password: registerData.password,
+          firstName: registerData.firstName,
+          lastName: registerData.lastName
+        }),
+      });
+
+      if (insertUserResponse.ok) {
+        setRegisterSuccess('Tài khoản đã được tạo thành công! Bạn có thể đăng nhập ngay bây giờ.');
+        setRegisterData({
+          email: '',
+          password: '',
+          firstName: '',
+          lastName: ''
+        });
+        setTimeout(() => {
+          setShowRegisterModal(false);
+          setRegisterSuccess('');
+        }, 2000);
+      } else {
+        const errorData = await insertUserResponse.json().catch(() => ({}));
+        setRegisterError(errorData.message || 'Có lỗi xảy ra khi tạo tài khoản. Vui lòng thử lại.');
+      }
+    } catch (error) {
+      console.error('Register error:', error);
+      setRegisterError('Có lỗi xảy ra. Vui lòng thử lại sau.');
+    } finally {
+      setIsRegistering(false);
     }
   };
 
@@ -187,13 +266,16 @@ export default function LoginPage() {
               </button>
             </div>
 
-            {/* Register Link */}
+            {/* Register Link - Updated */}
             <div className="mt-6 text-center">
               <p className="text-gray-600">
                 Chưa có tài khoản?{' '}
-                <Link href="/register" className="text-[#ff6b35] hover:text-[#ff8c42] font-semibold transition-colors">
+                <button
+                  onClick={() => setShowRegisterModal(true)}
+                  className="text-[#ff6b35] hover:text-[#ff8c42] font-semibold transition-colors cursor-pointer"
+                >
                   Đăng ký ngay
-                </Link>
+                </button>
               </p>
             </div>
 
@@ -206,6 +288,143 @@ export default function LoginPage() {
           </div>
         </AnimatedSection>
       </div>
+
+      {/* Register Modal */}
+      {showRegisterModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 border border-gray-100 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="text-center mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold text-gray-900">Đăng ký tài khoản</h2>
+                <button
+                  onClick={() => {
+                    setShowRegisterModal(false);
+                    setRegisterError('');
+                    setRegisterSuccess('');
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <p className="text-gray-600">Tạo tài khoản mới để truy cập FPT University</p>
+            </div>
+
+            {/* Success Message */}
+            {registerSuccess && (
+              <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-green-600 text-sm">{registerSuccess}</p>
+              </div>
+            )}
+
+            {/* Error Message */}
+            {registerError && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-600 text-sm">{registerError}</p>
+              </div>
+            )}
+
+            {/* Register Form */}
+            <form onSubmit={handleRegisterSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-2">
+                    Họ
+                  </label>
+                  <input
+                    type="text"
+                    id="firstName"
+                    name="firstName"
+                    value={registerData.firstName}
+                    onChange={handleRegisterInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff6b35] focus:border-[#ff6b35] outline-none transition-colors"
+                    placeholder="Họ"
+                    required
+                  />
+                </div>
+                <div>
+                  <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-2">
+                    Tên
+                  </label>
+                  <input
+                    type="text"
+                    id="lastName"
+                    name="lastName"
+                    value={registerData.lastName}
+                    onChange={handleRegisterInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff6b35] focus:border-[#ff6b35] outline-none transition-colors"
+                    placeholder="Tên"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="registerEmail" className="block text-sm font-medium text-gray-700 mb-2">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  id="registerEmail"
+                  name="email"
+                  value={registerData.email}
+                  onChange={handleRegisterInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff6b35] focus:border-[#ff6b35] outline-none transition-colors"
+                  placeholder="Nhập email"
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="registerPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                  Mật khẩu
+                </label>
+                <input
+                  type="password"
+                  id="registerPassword"
+                  name="password"
+                  value={registerData.password}
+                  onChange={handleRegisterInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff6b35] focus:border-[#ff6b35] outline-none transition-colors"
+                  placeholder="Nhập mật khẩu"
+                  required
+                />
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRegisterModal(false);
+                    setRegisterError('');
+                    setRegisterSuccess('');
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={isRegistering}
+                  className="flex-1 bg-[#ff6b35] text-white py-2 px-4 rounded-lg hover:bg-[#ff8c42] focus:ring-4 focus:ring-[#ff6b35]/20 transition-all duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isRegistering ? (
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Đang tạo...
+                    </div>
+                  ) : (
+                    'Đăng ký'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

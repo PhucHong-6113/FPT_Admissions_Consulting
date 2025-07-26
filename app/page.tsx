@@ -6,34 +6,47 @@ import AnimatedSection from "../components/AnimatedSection";
 import Carousel from "../components/Carousel";
 import { useState, useEffect } from "react";
 import { isAuthenticated, fetchUserProfile, getStoredUserProfile, logout, UserProfile } from "../utils/auth";
+import { useRouter } from 'next/navigation';
+import {SERVICE_URLS} from '../utils/services';
 
 export default function Home() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [showBubble, setShowBubble] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const router = useRouter();
 
   // Check authentication status and fetch user profile on component mount
   useEffect(() => {
     const checkAuth = async () => {
       if (isAuthenticated()) {
         setIsLoggedIn(true);
-
-        // Try to get stored profile first
         let profile = getStoredUserProfile();
-
         if (!profile) {
-          // If no stored profile, fetch from API
-          profile = await fetchUserProfile();
+          // Nếu chưa có profile, fetch từ API backend
+          const fetchApi = (await import('../utils/auth')).fetchUserProfileFromApi;
+          if (fetchApi) {
+            profile = await fetchApi();
+          }
         }
-
         if (profile) {
           setUserProfile(profile);
+        } else {
+          // Nếu không lấy được profile, coi như chưa đăng nhập
+          setIsLoggedIn(false);
+          setUserProfile(null);
         }
+      } else {
+        setIsLoggedIn(false);
+        setUserProfile(null);
       }
     };
-
+    // Lắng nghe sự thay đổi của access_token trong localStorage
+    window.addEventListener('storage', checkAuth);
     checkAuth();
+    return () => {
+      window.removeEventListener('storage', checkAuth);
+    };
   }, []);
 
   const handleLogout = () => {
@@ -45,6 +58,14 @@ export default function Home() {
   const toggleChat = () => {
     setIsChatOpen(!isChatOpen);
     setShowBubble(false);
+  };
+
+  const handleAppointmentClick = () => {
+    if (isAuthenticated()) {
+      router.push('/appointment');
+    } else {
+      router.push('/login');
+    }
   };
 
   return (
@@ -91,9 +112,12 @@ export default function Home() {
                 </Link>
               )}
 
-              <a href="#contact" className="bg-[#ff6b35] text-white px-4 py-2 rounded-lg hover:bg-[#ff8c42] transition-colors">
+              <button
+                onClick={handleAppointmentClick}
+                className="bg-[#ff6b35] text-white px-4 py-2 rounded-lg hover:bg-[#ff8c42] transition-colors"
+              >
                 Tư vấn
-              </a>
+              </button>
             </div>
             <div className="md:hidden flex items-center">
               <button className="text-gray-700">
@@ -122,7 +146,10 @@ export default function Home() {
                     và kinh doanh tương lai. Với phương pháp giảng dạy tiên tiến và kết nối chặt chẽ với doanh nghiệp.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-4">
-                    <button className="bg-[#ff6b35] text-white px-8 py-4 rounded-lg hover:bg-[#ff8c42] transition-colors font-semibold text-lg">
+                    <button
+                      onClick={handleAppointmentClick}
+                      className="bg-[#ff6b35] text-white px-8 py-4 rounded-lg hover:bg-[#ff8c42] transition-colors font-semibold text-lg"
+                    >
                       Đăng ký tư vấn
                     </button>
                     <button className="border-2 border-[#ff6b35] text-[#ff6b35] px-8 py-4 rounded-lg hover:bg-[#ff6b35] hover:text-white transition-colors font-semibold text-lg">
