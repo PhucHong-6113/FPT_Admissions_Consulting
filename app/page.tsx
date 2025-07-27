@@ -186,9 +186,12 @@ export default function Home() {
                     >
                       Đăng ký tư vấn
                     </button>
-                    <button className="border-2 border-[#ff6b35] text-[#ff6b35] px-8 py-4 rounded-lg hover:bg-[#ff6b35] hover:text-white transition-colors font-semibold text-lg">
-                      Gửi ticket
-                    </button>
+                    <button
+  onClick={() => router.push('/request-tickets')}
+  className="border-2 border-[#ff6b35] text-[#ff6b35] px-8 py-4 rounded-lg hover:bg-[#ff6b35] hover:text-white transition-colors font-semibold text-lg"
+>
+  Gửi ticket
+</button>
                   </div>
                 </div>
               </AnimatedSection>
@@ -793,7 +796,7 @@ export default function Home() {
                         <div className="w-6 h-6 bg-white rounded-full border border-gray-200 flex items-center justify-center overflow-hidden mr-2 flex-shrink-0">
                           <Image src="/logo.png" alt="FPT.AI" width={16} height={16} className="object-cover" />
                         </div>
-
+                        
                         <div className="bg-white rounded-lg p-3 shadow-sm">
                           <div className="text-xs text-gray-500 mb-1">Đang trả lời...</div>
                           <div className="flex space-x-1">
