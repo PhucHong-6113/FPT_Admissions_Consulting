@@ -5,7 +5,7 @@
     import Link from 'next/link';
     import Image from 'next/image';
     import AnimatedSection from '../../components/AnimatedSection';
-    import { SERVICE_URLS } from '../../utils/services';
+    import { SERVICE_URLS, createAppointment } from '../../utils/services';
 
     interface CounselorSchedule {
       scheduleId: string;
@@ -70,6 +70,7 @@
       const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
       const [selectedSlot, setSelectedSlot] = useState<CounselorSchedule | null>(null);
       const [showBookingModal, setShowBookingModal] = useState(false);
+      const [showCounselorModal, setShowCounselorModal] = useState(false);
       const router = useRouter();
 
       useEffect(() => {
@@ -124,18 +125,22 @@
       const getCounselors = (dayId: number, slotId: number) =>
         schedules.filter(s => s.dayId === dayId && s.slotId === slotId);
 
+      // Sửa lại: khi bấm vào slot, chỉ mở modal chi tiết
       const handleSlotClick = (slot: CounselorSchedule) => {
-        if (slot.statusId === ScheduleStatus.Available) {
-          setSelectedSlot(slot);
-          setShowBookingModal(true);
-        }
+        setSelectedSlot(slot);
+        setShowCounselorModal(true);
       };
 
-      const handleBooking = () => {
-        // Booking logic here
+      const handleBooking = async () => {
+        if (!selectedSlot) return;
         setShowBookingModal(false);
-        setSelectedSlot(null);
-        fetchCounselorSchedules();
+        // Gọi API tạo lịch hẹn và redirect đến checkoutUrl nếu thành công
+        const checkoutUrl = await createAppointment(selectedSlot.scheduleId, 'Đặt lịch tư vấn');
+        if (checkoutUrl) {
+          window.location.href = checkoutUrl;
+        } else {
+          alert('Đặt lịch thất bại. Vui lòng thử lại.');
+        }
       };
 
       const getStatusBadge = (statusId: number) => {
@@ -256,34 +261,35 @@
                         <td className="p-3 font-semibold text-gray-700 bg-white rounded-l-xl shadow">{slot.slot}</td>
                         {days.map(day => {
                           const counselors = getCounselors(day.dayId, slot.slotId);
+                          if (counselors.length === 0) {
+                            return (
+                              <td key={day.dayId} className="p-3 bg-white rounded shadow align-top">
+                                <span className="text-gray-300 text-xs">-</span>
+                              </td>
+                            );
+                          }
+                          const c = counselors[0];
                           return (
                             <td key={day.dayId} className="p-3 bg-white rounded shadow align-top">
-                              {counselors.length === 0 ? (
-                                <span className="text-gray-300 text-xs">-</span>
-                              ) : (
-                                counselors.map(c => (
-                                  <button
-                                    key={c.scheduleId}
-                                    onClick={() => handleSlotClick(c)}
-                                    disabled={c.statusId === ScheduleStatus.Booked}
-                                    className={`
-                                      w-full mb-2 last:mb-0 px-3 py-2 rounded-lg border-2 text-sm font-medium flex flex-col items-start transition-all duration-200
-                                      ${c.statusId === ScheduleStatus.Available
-                                        ? 'border-[#ff6b35] bg-[#fff5f2] hover:bg-[#ffecd9] hover:scale-[1.03] text-[#ff6b35]'
-                                        : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
-                                      }
-                                    `}
-                                  >
-                                    <div className="flex items-center gap-2 mb-1">
-                                      <div className="w-7 h-7 rounded-full bg-[#ffecd9] flex items-center justify-center text-[#ff6b35] font-bold shadow-sm">
-                                        {c.counselorName.charAt(0)}
-                                      </div>
-                                      <span className="font-semibold">{c.counselorName}</span>
-                                    </div>
-                                    {getStatusBadge(c.statusId)}
-                                  </button>
-                                ))
-                              )}
+                              <button
+                                key={c.scheduleId}
+                                onClick={() => handleSlotClick(c)}
+                                disabled={c.statusId === ScheduleStatus.Booked}
+                                className={`w-full mb-2 last:mb-0 px-3 py-2 rounded-lg border-2 text-sm font-medium flex flex-col items-start transition-all duration-200
+                                  ${c.statusId === ScheduleStatus.Available
+                                    ? 'border-[#ff6b35] bg-[#fff5f2] hover:bg-[#ffecd9] hover:scale-[1.03] text-[#ff6b35]'
+                                    : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                                }
+                              `}
+                              >
+                                <div className="flex items-center gap-2 mb-1">
+                                  <div className="w-7 h-7 rounded-full bg-[#ffecd9] flex items-center justify-center text-[#ff6b35] font-bold shadow-sm">
+                                    {c.counselorName.charAt(0)}
+                                  </div>
+                                  <span className="font-semibold">{c.counselorName}</span>
+                                </div>
+                                {getStatusBadge(c.statusId)}
+                              </button>
                             </td>
                           );
                         })}
@@ -353,6 +359,47 @@
                     Xác nhận đặt lịch
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modal chi tiết counselor */}
+          {showCounselorModal && selectedSlot && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+              <div className="absolute inset-0 backdrop-blur-sm bg-transparent transition-all duration-300" onClick={() => { setShowCounselorModal(false); setSelectedSlot(null); }} />
+              <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md z-10 relative">
+                <h2 className="text-xl font-bold mb-4 text-[#ff6b35] flex items-center gap-2">
+                  <svg className="w-6 h-6 text-[#ff8c42]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                  Thông tin chuyên gia tư vấn
+                </h2>
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-16 h-16 rounded-full bg-[#ffecd9] flex items-center justify-center text-[#ff6b35] font-bold text-2xl shadow">
+                    {selectedSlot.counselorName.charAt(0)}
+                  </div>
+                  <div className="font-bold text-[#ff6b35] text-lg flex items-center gap-1">
+                    <svg className="w-5 h-5 text-[#ff8c42]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5.121 17.804A13.937 13.937 0 0112 15c2.5 0 4.847.655 6.879 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    {selectedSlot.counselorName}
+                  </div>
+                  <div className="text-gray-500 text-sm flex items-center gap-1">
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16 2a2 2 0 012 2v2M8 2a2 2 0 00-2 2v2m0 0H5a2 2 0 00-2 2v12a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-1M6 6h12"/></svg>
+                    {selectedSlot.counselorEmail}
+                  </div>
+                  <div className="text-gray-600 text-sm flex items-center gap-1">
+                    <svg className="w-4 h-4 text-[#ff6b35]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3"/></svg>
+                    {selectedSlot.slot}
+                  </div>
+                  {selectedSlot.statusId === ScheduleStatus.Available ? (
+                    <button
+                      className="mt-4 bg-[#ff6b35] text-white px-6 py-2 rounded-lg font-semibold hover:bg-[#ff8c42] transition-colors"
+                      onClick={() => { setShowCounselorModal(false); setShowBookingModal(true); }}
+                    >
+                      Đặt lịch
+                    </button>
+                  ) : (
+                    <span className="mt-4 inline-block px-3 py-1 rounded bg-red-100 text-red-700 text-sm font-semibold border border-red-200">Đã đặt</span>
+                  )}
+                </div>
+                <button className="absolute top-3 right-3 text-gray-400 hover:text-[#ff6b35] text-2xl" onClick={() => { setShowCounselorModal(false); setSelectedSlot(null); }}>×</button>
               </div>
             </div>
           )}

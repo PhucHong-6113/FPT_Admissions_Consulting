@@ -23,6 +23,7 @@ function storeTokens(tokens: AuthTokens) {
   localStorage.setItem('expires_in', tokens.expires_in.toString());
   localStorage.setItem('refresh_token', tokens.refresh_token);
   localStorage.setItem('scope', tokens.scope);
+
   // Optionally, store expiration time
   const expirationTime = new Date().getTime() + (tokens.expires_in * 1000);
   localStorage.setItem('token_expiration', expirationTime.toString());
@@ -78,11 +79,25 @@ export default function LoginPage() {
 
       if (tokenResponse.ok) {
         const data: AuthTokens = await tokenResponse.json();
-
-        // Use the enhanced token storage function that includes automatic refresh monitoring
         storeTokens(data);
-
-        console.log('Login successful, tokens stored with auto-refresh monitoring');
+        // Fetch user profile after login
+        try {
+          const profileRes = await fetch(`${SERVICE_URLS.AuthService}/api/v1/User/SelectUserProfile`, {
+            method: 'GET',
+            headers: {
+              'accept': 'application/json',
+              'Authorization': `Bearer ${data.access_token}`,
+            },
+          });
+          if (profileRes.ok) {
+            const profileData = await profileRes.json();
+            if (profileData && profileData.success && profileData.response) {
+              localStorage.setItem('user_profile', JSON.stringify(profileData.response));
+            }
+          }
+        } catch (e) {
+          // ignore profile fetch error
+        }
         window.location.href = '/';
       } else {
         const errorData = await tokenResponse.json().catch(() => ({}));
