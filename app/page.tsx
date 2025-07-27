@@ -8,6 +8,7 @@ import { useState, useRef, useEffect } from "react";
 import { isAuthenticated, fetchUserProfile, getStoredUserProfile, logout, UserProfile } from "../utils/auth";
 import { useRouter } from 'next/navigation';
 import {SERVICE_URLS} from '../utils/services';
+import Header from "../components/Header";
 
 export default function Home() {
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -160,65 +161,8 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Navigation */}
-      <nav className="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <div className="text-2xl font-bold text-[#ff6b35]">
-                <img security="strict-origin-when-cross-origin" src="/logo.png" alt="FPT University Logo" className="h-8 w-auto inline-block mr-2" />
-              </div>
-            </div>
-            <div className="hidden md:flex items-center space-x-8">
-              <a href="#about" className="text-gray-700 hover:text-[#ff6b35] px-3 py-2 text-sm font-medium">
-                Giới thiệu
-              </a>
-              <a href="#programs" className="text-gray-700 hover:text-[#ff6b35] px-3 py-2 text-sm font-medium">
-                Chương trình
-              </a>
-              <a href="#why-fpt" className="text-gray-700 hover:text-[#ff6b35] px-3 py-2 text-sm font-medium">
-                Tại sao chọn FPT
-              </a>
-              <a href="#tuition" className="text-gray-700 hover:text-[#ff6b35] px-3 py-2 text-sm font-medium">
-                Học phí
-              </a>
-
-              {/* Authentication Section */}
-              {isLoggedIn && userProfile ? (
-                <div className="flex items-center space-x-4">
-                  <span className="text-[#ff6b35] font-medium text-sm">
-                    Xin chào {userProfile.firstName} {userProfile.lastName}!
-                  </span>
-                  <button
-                    onClick={handleLogout}
-                    className="text-gray-700 hover:text-[#ff6b35] px-3 py-2 text-sm font-medium"
-                  >
-                    Đăng xuất
-                  </button>
-                </div>
-              ) : (
-                <Link href="/login" className="text-gray-700 hover:text-[#ff6b35] px-3 py-2 text-sm font-medium">
-                  Đăng nhập
-                </Link>
-              )}
-
-              <button
-                onClick={handleAppointmentClick}
-                className="bg-[#ff6b35] text-white px-4 py-2 rounded-lg hover:bg-[#ff8c42] transition-colors"
-              >
-                Tư vấn
-              </button>
-            </div>
-            <div className="md:hidden flex items-center">
-              <button className="text-gray-700">
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Header />
+      {/* Navigation đã chuyển sang component Header */}
 
       {/* Hero Section */}
       <AnimatedSection animation="fadeIn" duration={800}>
@@ -242,7 +186,7 @@ export default function Home() {
                     >
                       Đăng ký tư vấn
                     </button>
-                    <button 
+                    <button
   onClick={() => router.push('/request-tickets')}
   className="border-2 border-[#ff6b35] text-[#ff6b35] px-8 py-4 rounded-lg hover:bg-[#ff6b35] hover:text-white transition-colors font-semibold text-lg"
 >
@@ -852,7 +796,7 @@ export default function Home() {
                         <div className="w-6 h-6 bg-white rounded-full border border-gray-200 flex items-center justify-center overflow-hidden mr-2 flex-shrink-0">
                           <Image src="/logo.png" alt="FPT.AI" width={16} height={16} className="object-cover" />
                         </div>
-
+                        
                         <div className="bg-white rounded-lg p-3 shadow-sm">
                           <div className="text-xs text-gray-500 mb-1">Đang trả lời...</div>
                           <div className="flex space-x-1">
