@@ -16,16 +16,23 @@ interface AuthTokens {
 }
 
 // Simple storeTokens function
-function storeTokens(tokens: AuthTokens) {
+function storeTokens(tokens: AuthTokens, userProfile?: any) {
   if (typeof window === 'undefined') return;
+
   localStorage.setItem('access_token', tokens.access_token);
   localStorage.setItem('token_type', tokens.token_type);
   localStorage.setItem('expires_in', tokens.expires_in.toString());
   localStorage.setItem('refresh_token', tokens.refresh_token);
   localStorage.setItem('scope', tokens.scope);
-  // Optionally, store expiration time
-  const expirationTime = new Date().getTime() + (tokens.expires_in * 1000);
+
+  const expirationTime = new Date().getTime() + tokens.expires_in * 1000;
   localStorage.setItem('token_expiration', expirationTime.toString());
+
+  if (userProfile) {
+    localStorage.setItem('user_profile', JSON.stringify(userProfile));
+    localStorage.setItem('user_id', userProfile.email);
+    localStorage.setItem('student_id', userProfile.userId); // ✔️ đây là ID backend
+  }
 }
 
 export default function LoginPage() {
