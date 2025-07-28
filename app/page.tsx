@@ -3,107 +3,9 @@
 import Image from "next/image";
 import AnimatedSection from "../components/AnimatedSection";
 import Carousel from "../components/Carousel";
-import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
 
 export default function Home() {
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [showBubble, setShowBubble] = useState(true);
-  const [messages, setMessages] = useState<Array<{id: string, text: string, isUser: boolean, timestamp: Date, serverTime?: string}>>([]);
-  const [inputValue, setInputValue] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Default questions for first-time users
-  const defaultQuestions = [
-    "FPT có bao nhiều ki? và học phí mỗi kì là bao nhiêu?",
-    "Những ngành học nào tại FPT University?",
-    "Điều kiện tuyển sinh của FPT là gì?",
-    "Cơ sở vật chất và môi trường học tập tại FPT như thế nào?",
-    "Chính sách học bổng tại FPT University?"
-  ];
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const sendMessage = async (messageText: string) => {
-    if (!messageText.trim() || isLoading) return;
-
-    const userMessage = {
-      id: Date.now().toString(),
-      text: messageText,
-      isUser: true,
-      timestamp: new Date()
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInputValue('');
-    setIsLoading(true);
-
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_LOCAL_BASE_URL}/api/chatbot`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          question: messageText
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      const botMessage = {
-        id: (Date.now() + 1).toString(),
-        text: data.answer,
-        isUser: false,
-        timestamp: new Date(),
-        serverTime: data.text_time
-      };
-
-      setMessages(prev => [...prev, botMessage]);
-    } catch (error) {
-      console.error('Error calling chatbot API:', error);
-      const errorMessage = {
-        id: (Date.now() + 1).toString(),
-        text: 'Xin lỗi, có lỗi kết nối. Vui lòng thử lại sau.',
-        isUser: false,
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleInputSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    sendMessage(inputValue);
-  };
-
-  const handleDefaultQuestion = (question: string) => {
-    sendMessage(question);
-  };
-
-  const refreshChat = () => {
-    setMessages([]);
-    setInputValue('');
-    setIsLoading(false);
-  };
-
-  const toggleChat = () => {
-    setIsChatOpen(!isChatOpen);
-    setShowBubble(false);
-  };
-
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation */}
@@ -128,9 +30,9 @@ export default function Home() {
               <a href="#tuition" className="text-gray-700 hover:text-[#ff6b35] px-3 py-2 text-sm font-medium">
                 Học phí
               </a>
-              <a href="#contact" className="bg-[#ff6b35] text-white px-4 py-2 rounded-lg hover:bg-[#ff8c42] transition-colors">
+              <Link href="/chatbot" className="bg-[#ff6b35] text-white px-4 py-2 rounded-lg hover:bg-[#ff8c42] transition-colors">
                 Tư vấn
-              </a>
+              </Link>
             </div>
             <div className="md:hidden flex items-center">
               <button className="text-gray-700">
@@ -159,12 +61,12 @@ export default function Home() {
                     và kinh doanh tương lai. Với phương pháp giảng dạy tiên tiến và kết nối chặt chẽ với doanh nghiệp.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-4">
-                    <button className="bg-[#ff6b35] text-white px-8 py-4 rounded-lg hover:bg-[#ff8c42] transition-colors font-semibold text-lg">
+                    <Link href="/chatbot" className="bg-[#ff6b35] text-white px-8 py-4 rounded-lg hover:bg-[#ff8c42] transition-colors font-semibold text-lg text-center">
                       Đăng ký tư vấn
-                    </button>
-                    <button className="border-2 border-[#ff6b35] text-[#ff6b35] px-8 py-4 rounded-lg hover:bg-[#ff6b35] hover:text-white transition-colors font-semibold text-lg">
+                    </Link>
+                    <Link href="/chatbot" className="border-2 border-[#ff6b35] text-[#ff6b35] px-8 py-4 rounded-lg hover:bg-[#ff6b35] hover:text-white transition-colors font-semibold text-lg text-center">
                       Gửi ticket
-                    </button>
+                    </Link>
                   </div>
                 </div>
               </AnimatedSection>
@@ -637,206 +539,25 @@ export default function Home() {
 
       {/* Floating Chat Button */}
       <div className="fixed bottom-6 right-6 z-50">
-        {/* Chat Bubble */}
-        {showBubble && !isChatOpen && (
-          <div className="absolute bottom-20 right-0 bg-white border border-gray-200 rounded-lg p-4 shadow-lg w-72 animate-bounce">
-            <div className="text-base text-gray-700 font-medium">
-              Bấm vào đây để trò chuyện cùng FPT.AI
-            </div>
-            <div className="absolute bottom-[-8px] right-8 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-white"></div>
-            <button 
-              onClick={() => setShowBubble(false)}
-              className="absolute top-2 right-3 text-gray-400 hover:text-gray-600 text-lg"
-            >
-              ×
-            </button>
-          </div>
-        )}
-
-        {/* Chat Window */}
-        {isChatOpen && (
-          <div className="absolute bottom-20 right-0 w-80 h-96 bg-white border border-gray-200 rounded-lg shadow-xl">
-            {/* Chat Header */}
-            <div className="bg-[#ff6b35] text-white p-4 rounded-t-lg flex justify-between items-center">
-              <div className="flex items-center">
-                <Image src="/logo.png" alt="FPT.AI" width={24} height={24} className="mr-2" />
-                <div>
-                  <div className="font-semibold">FPT.AI</div>
-                  <div className="text-xs opacity-90">Trợ lý tư vấn</div>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <button 
-                  onClick={refreshChat}
-                  className="text-white hover:text-gray-200 p-1"
-                  title="Làm mới cuộc trò chuyện"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                </button>
-                <button 
-                  onClick={toggleChat}
-                  className="text-white hover:text-gray-200"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-
-            {/* Chat Messages */}
-            <div className="h-64 p-4 overflow-y-auto bg-gray-50">
-              {messages.length === 0 ? (
-                <>
-                  {/* Welcome Message */}
-                  <div className="mb-4">
-                    <div className="flex items-start">
-                      <div className="w-6 h-6 bg-white rounded-full border border-gray-200 flex items-center justify-center overflow-hidden mr-2 flex-shrink-0">
-                        <Image src="/logo.png" alt="FPT.AI" width={16} height={16} className="object-cover" />
-                      </div>
-                      <div className="bg-white rounded-lg p-3 shadow-sm max-w-xs">
-                        <div className="text-xs text-gray-500 mb-1">
-                          {new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                        </div>
-                        <div className="text-sm text-gray-700">
-                          Xin chào! Tôi là FPT.AI, trợ lý tư vấn tuyển sinh của FPT University. 
-                          Tôi có thể giúp bạn tìm hiểu về chương trình đào tạo, học phí, thủ tục tuyển sinh và nhiều thông tin khác.
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Default Questions */}
-                  <div className="space-y-2">
-                    <div className="text-xs text-gray-500 mb-2 text-center">Một số câu hỏi thường gặp:</div>
-                    {defaultQuestions.map((question, index) => (
-                      <button 
-                        key={index}
-                        onClick={() => handleDefaultQuestion(question)}
-                        className="w-full text-left bg-white border border-gray-200 rounded-lg p-2 hover:bg-[#fff5f2] hover:border-[#ff6b35] text-sm transition-colors"
-                      >
-                        {question}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <>
-                  {/* Messages */}
-                  {messages.map((message) => (
-                    <div key={message.id} className={`mb-4 flex ${message.isUser ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`flex items-start max-w-xs ${message.isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-                        {/* Avatar */}
-                        <div className={`flex-shrink-0 ${message.isUser ? 'ml-2' : 'mr-2'}`}>
-                          {message.isUser ? (
-                            <div className="w-6 h-6 bg-[#ff6b35] rounded-full flex items-center justify-center">
-                              <span className="text-white text-xs font-semibold">U</span>
-                            </div>
-                          ) : (
-                            <div className="w-6 h-6 bg-white rounded-full border border-gray-200 flex items-center justify-center overflow-hidden">
-                              <Image src="/logo.png" alt="FPT.AI" width={16} height={16} className="object-cover" />
-                            </div>
-                          )}
-                        </div>
-                        
-                        {/* Message Content */}
-                        <div className={`rounded-lg p-3 shadow-sm ${
-                          message.isUser 
-                            ? 'bg-[#ff6b35] text-white' 
-                            : 'bg-white text-gray-700'
-                        }`}>
-                          {/* Time at the top */}
-                          <div className={`text-xs mb-1 ${message.isUser ? 'text-orange-100' : 'text-gray-500'}`}>
-                            {message.isUser 
-                              ? message.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                              : message.serverTime 
-                                ? new Date(message.serverTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                                : message.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                            }
-                          </div>
-                          {/* Message text */}
-                          <div className="text-sm whitespace-pre-wrap">{message.text}</div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Loading indicator */}
-                  {isLoading && (
-                    <div className="mb-4 flex justify-start">
-                      <div className="flex items-start">
-                        {/* Bot Avatar */}
-                        <div className="w-6 h-6 bg-white rounded-full border border-gray-200 flex items-center justify-center overflow-hidden mr-2 flex-shrink-0">
-                          <Image src="/logo.png" alt="FPT.AI" width={16} height={16} className="object-cover" />
-                        </div>
-                        
-                        <div className="bg-white rounded-lg p-3 shadow-sm">
-                          <div className="text-xs text-gray-500 mb-1">Đang trả lời...</div>
-                          <div className="flex space-x-1">
-                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div ref={messagesEndRef} />
-                </>
-              )}
-            </div>
-
-            {/* Chat Input */}
-            <div className="p-4 border-t border-gray-200">
-              <form onSubmit={handleInputSubmit} className="flex">
-                <input
-                  type="text"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  placeholder="Nhập câu hỏi của bạn..."
-                  className="flex-1 border border-gray-300 rounded-l-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff6b35] focus:border-transparent"
-                  disabled={isLoading}
-                />
-                <button 
-                  type="submit"
-                  disabled={isLoading || !inputValue.trim()}
-                  className="bg-[#ff6b35] text-white px-4 py-2 rounded-r-lg hover:bg-[#ff8c42] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isLoading ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                    </svg>
-                  )}
-                </button>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Chat Button */}
-        <button
-          onClick={toggleChat}
-          className="bg-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center group p-2"
-        >
-          {isChatOpen ? (
-            <div className="w-16 h-16 bg-[#ff6b35] rounded-full flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </div>
-          ) : (
+        <Link href="/chatbot">
+          <div className="bg-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center group p-3 cursor-pointer">
             <Image 
               src="/logo.png" 
               alt="FPT Chat" 
               width={64} 
               height={64}
-              className="group-hover:scale-110 transition-transform duration-300 animate-bounce"
+              className="group-hover:scale-110 transition-transform duration-300"
             />
-          )}
-        </button>
+          </div>
+        </Link>
+        
+        {/* Chat Bubble - Info */}
+        <div className="absolute bottom-20 right-0 bg-white border border-gray-200 rounded-lg p-4 shadow-lg w-72 animate-bounce">
+          <div className="text-base text-gray-700 font-medium">
+            Bấm vào đây để trò chuyện cùng FPT.AI
+          </div>
+          <div className="absolute bottom-[-8px] right-8 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-white"></div>
+        </div>
       </div>
     </div>
   );
