@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { SERVICE_URLS } from "../../utils/services";
 
 export default function ChatbotPage() {
   const [messages, setMessages] = useState<Array<{id: string, text: string, isUser: boolean, timestamp: Date, serverTime?: string}>>([]);
@@ -47,7 +48,7 @@ export default function ChatbotPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_LOCAL_BASE_URL}/api/chatbot`, {
+      const response = await fetch(`${SERVICE_URLS.ChatbotService}/api/chatbot`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
