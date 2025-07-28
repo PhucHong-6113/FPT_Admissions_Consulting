@@ -71,6 +71,10 @@ export default function AppointmentPage() {
     const [selectedSlot, setSelectedSlot] = useState<CounselorSchedule | null>(null);
     const [showBookingModal, setShowBookingModal] = useState(false);
     const [showCounselorModal, setShowCounselorModal] = useState(false);
+    const [showUpdatePhoneModal, setShowUpdatePhoneModal] = useState(false);
+    const [phoneInput, setPhoneInput] = useState('');
+    const [phoneUpdateLoading, setPhoneUpdateLoading] = useState(false);
+    const [phoneUpdateError, setPhoneUpdateError] = useState('');
     const router = useRouter();
 
     useEffect(() => {
@@ -79,7 +83,13 @@ export default function AppointmentPage() {
             return;
         }
         const profile = getStoredUserProfile();
-        if (profile) setUserProfile(profile);
+        if (profile) {
+            setUserProfile(profile);
+            if (!profile.phoneNumber) {
+                setShowUpdatePhoneModal(true);
+                setPhoneInput('');
+            }
+        }
         fetchCounselorSchedules();
     }, [router]);
 
@@ -87,7 +97,7 @@ export default function AppointmentPage() {
         try {
             setIsLoading(true);
             const response = await fetch(
-                `${SERVICE_URLS.AppointmentService}/api/v1/counselor-schedule/SelectCounselorSchedules`,
+                `${SERVICE_URLS.AppointmentService}/api/v1/counselor-schedule`,
                 { method: 'GET', headers: { accept: 'application/json' } }
             );
             if (response.ok) {
@@ -163,6 +173,54 @@ export default function AppointmentPage() {
                 Không xác định
               </span>
                 );
+        }
+    };
+
+    // Hàm cập nhật số điện thoại
+    const handleUpdatePhone = async () => {
+        setPhoneUpdateLoading(true);
+        setPhoneUpdateError('');
+        const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+        if (!token) {
+            setPhoneUpdateError('Bạn chưa đăng nhập.');
+            setPhoneUpdateLoading(false);
+            return;
+        }
+        try {
+            // Lấy thông tin user hiện tại để gửi đủ các trường
+            const currentProfile = userProfile || {};
+            const formData = new FormData();
+            formData.append('Email', currentProfile.email || '');
+            formData.append('PhoneNumber', phoneInput);
+            formData.append('FirstName', currentProfile.firstName || '');
+            formData.append('LastName', currentProfile.lastName || '');
+            formData.append('DateOfBirth', currentProfile.dateOfBirth || '');
+            formData.append('Gender', currentProfile.gender || '');
+            formData.append('Address', currentProfile.address || '');
+            formData.append('AvatarFile', '');
+            const res = await fetch(`${SERVICE_URLS.AuthService}/api/v1/user/UpdateUser`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'accept': 'application/octet-stream',
+                },
+                body: formData,
+            });
+            const data = await res.json();
+            if (data && data.success) {
+                const updatedProfile = { ...currentProfile, phoneNumber: phoneInput };
+                setUserProfile(updatedProfile);
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem('user_profile', JSON.stringify(updatedProfile));
+                }
+                setShowUpdatePhoneModal(false);
+            } else {
+                setPhoneUpdateError(data?.message || 'Cập nhật thất bại.');
+            }
+        } catch {
+            setPhoneUpdateError('Có lỗi xảy ra khi cập nhật.');
+        } finally {
+            setPhoneUpdateLoading(false);
         }
     };
 
@@ -268,28 +326,29 @@ export default function AppointmentPage() {
                                                 </td>
                                             );
                                         }
-                                        const c = counselors[0];
                                         return (
                                             <td key={day.dayId} className="p-3 bg-white rounded shadow align-top">
-                                                <button
-                                                    key={c.scheduleId}
-                                                    onClick={() => handleSlotClick(c)}
-                                                    disabled={c.statusId === ScheduleStatus.Booked}
-                                                    className={`w-full mb-2 last:mb-0 px-3 py-2 rounded-lg border-2 text-sm font-medium flex flex-col items-start transition-all duration-200
-                                  ${c.statusId === ScheduleStatus.Available
-                                                        ? 'border-[#ff6b35] bg-[#fff5f2] hover:bg-[#ffecd9] hover:scale-[1.03] text-[#ff6b35]'
-                                                        : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
-                                                    }
-                              `}
-                                                >
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <div className="w-7 h-7 rounded-full bg-[#ffecd9] flex items-center justify-center text-[#ff6b35] font-bold shadow-sm">
-                                                            {c.counselorName.charAt(0)}
+                                                {counselors.map(c => (
+                                                    <button
+                                                        key={c.scheduleId}
+                                                        onClick={() => handleSlotClick(c)}
+                                                        disabled={c.statusId === ScheduleStatus.Booked}
+                                                        className={`w-full mb-2 last:mb-0 px-3 py-2 rounded-lg border-2 text-sm font-medium flex flex-col items-start transition-all duration-200
+                                ${c.statusId === ScheduleStatus.Available
+                                    ? 'border-[#ff6b35] bg-[#fff5f2] hover:bg-[#ffecd9] hover:scale-[1.03] text-[#ff6b35]'
+                                    : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                                }
+                            `}
+                                                    >
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <div className="w-7 h-7 rounded-full bg-[#ffecd9] flex items-center justify-center text-[#ff6b35] font-bold shadow-sm">
+                                                                {c.counselorName.charAt(0)}
+                                                            </div>
+                                                            <span className="font-semibold">{c.counselorName}</span>
                                                         </div>
-                                                        <span className="font-semibold">{c.counselorName}</span>
-                                                    </div>
-                                                    {getStatusBadge(c.statusId)}
-                                                </button>
+                                                        {getStatusBadge(c.statusId)}
+                                                    </button>
+                                                ))}
                                             </td>
                                         );
                                     })}
@@ -400,6 +459,36 @@ export default function AppointmentPage() {
                             )}
                         </div>
                         <button className="absolute top-3 right-3 text-gray-400 hover:text-[#ff6b35] text-2xl" onClick={() => { setShowCounselorModal(false); setSelectedSlot(null); }}>×</button>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal cập nhật số điện thoại */}
+            {showUpdatePhoneModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    <div className="absolute inset-0 backdrop-blur-sm bg-black/20 transition-all duration-300" />
+                    <div className="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md z-10 relative">
+                        <h2 className="text-xl font-bold mb-4 text-[#ff6b35]">Cập nhật số điện thoại</h2>
+                        <p className="mb-4 text-gray-700">Bạn cần cập nhật số điện thoại trước khi đặt lịch tư vấn.</p>
+                        <input
+                            type="text"
+                            className="w-full px-3 py-2 border rounded-lg mb-2"
+                            placeholder="Nhập số điện thoại của bạn"
+                            value={phoneInput}
+                            onChange={e => setPhoneInput(e.target.value)}
+                            disabled={phoneUpdateLoading}
+                        />
+                        {phoneUpdateError && <div className="text-red-600 text-sm mb-2">{phoneUpdateError}</div>}
+                        <div className="flex gap-3 mt-4">
+                            <button
+                                type="button"
+                                onClick={handleUpdatePhone}
+                                className="flex-1 bg-[#ff6b35] text-white py-2 px-4 rounded-lg hover:bg-[#ff8c42] font-semibold"
+                                disabled={phoneUpdateLoading || !phoneInput}
+                            >
+                                {phoneUpdateLoading ? 'Đang lưu...' : 'Lưu'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

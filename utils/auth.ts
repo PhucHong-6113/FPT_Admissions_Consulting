@@ -54,9 +54,19 @@ export async function fetchUserProfileFromApi(): Promise<UserProfile | null> {
     if (!response.ok) return null;
     const data = await response.json();
     if (data && data.success && data.response) {
-      // Lưu user_profile vào localStorage
-      localStorage.setItem('user_profile', JSON.stringify(data.response));
-      return data.response;
+      // Nếu response có userId, email, firstName... thì lưu trực tiếp
+      if (data.response.userId && data.response.email && data.response.firstName && data.response.lastName) {
+        localStorage.setItem('user_profile', JSON.stringify(data.response));
+        return data.response;
+      }
+      // Nếu response chỉ có role hoặc thiếu thông tin, merge với profile cũ
+      let oldProfile = null;
+      try {
+        oldProfile = JSON.parse(localStorage.getItem('user_profile') || '{}');
+      } catch {}
+      const mergedProfile = { ...oldProfile, ...data.response };
+      localStorage.setItem('user_profile', JSON.stringify(mergedProfile));
+      return mergedProfile;
     }
     return null;
   } catch {

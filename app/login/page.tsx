@@ -29,6 +29,18 @@ function storeTokens(tokens: AuthTokens) {
   localStorage.setItem('token_expiration', expirationTime.toString());
 }
 
+// Hàm đăng xuất: Xóa toàn bộ thông tin đăng nhập khỏi localStorage
+export function logout() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('token_type');
+  localStorage.removeItem('expires_in');
+  localStorage.removeItem('refresh_token');
+  localStorage.removeItem('scope');
+  localStorage.removeItem('token_expiration');
+  localStorage.removeItem('user_profile');
+}
+
 export default function LoginPage() {
   const [formData, setFormData] = useState({
     username: '',
@@ -80,23 +92,53 @@ export default function LoginPage() {
       if (tokenResponse.ok) {
         const data: AuthTokens = await tokenResponse.json();
         storeTokens(data);
-        // Fetch user profile after login
+        let userRole = null;
+        // Gọi API SelectToken để lấy role mới nhất
         try {
-          const profileRes = await fetch(`${SERVICE_URLS.AuthService}/api/v1/User/SelectUserProfile`, {
+          const tokenInfoRes = await fetch(`${SERVICE_URLS.AuthService}/api/v1/user/SelectToken`, {
             method: 'GET',
             headers: {
               'accept': 'application/json',
               'Authorization': `Bearer ${data.access_token}`,
             },
           });
-          if (profileRes.ok) {
-            const profileData = await profileRes.json();
-            if (profileData && profileData.success && profileData.response) {
-              localStorage.setItem('user_profile', JSON.stringify(profileData.response));
+          if (tokenInfoRes.ok) {
+            const tokenInfo = await tokenInfoRes.json();
+            if (tokenInfo && tokenInfo.success && tokenInfo.response) {
+              userRole = tokenInfo.response.role || tokenInfo.response.Role || tokenInfo.response.user_role;
             }
           }
         } catch (e) {
-          // ignore profile fetch error
+          // ignore fetch error
+        }
+        // Gọi API SelectUserProfile để lấy thông tin hồ sơ người dùng và lưu kèm role
+        try {
+          const userProfileRes = await fetch(`${SERVICE_URLS.AuthService}/api/v1/User/SelectUserProfile`, {
+            method: 'GET',
+            headers: {
+              'accept': 'application/json',
+              'Authorization': `Bearer ${data.access_token}`,
+            },
+          });
+          if (userProfileRes.ok) {
+            const userProfile = await userProfileRes.json();
+            if (userProfile && userProfile.success && userProfile.response) {
+              // Gộp role vào response
+              const fullProfile = { ...userProfile.response, role: userRole };
+              localStorage.setItem('user_profile', JSON.stringify(fullProfile));
+              // Điều hướng theo role
+              if (userRole === 'Consultant') {
+                window.location.href = '/consultant';
+                return;
+              }
+              if (userRole === 'Admin') {
+                window.location.href = '/admin';
+                return;
+              }
+            }
+          }
+        } catch (e) {
+          // ignore fetch error
         }
         window.location.href = '/';
       } else {

@@ -187,11 +187,11 @@ export default function Home() {
                       Đăng ký tư vấn
                     </button>
                     <button
-  onClick={() => router.push('/request-tickets')}
-  className="border-2 border-[#ff6b35] text-[#ff6b35] px-8 py-4 rounded-lg hover:bg-[#ff6b35] hover:text-white transition-colors font-semibold text-lg"
->
-  Gửi ticket
-</button>
+                    onClick={() => router.push('/request-tickets')}
+                    className="border-2 border-[#ff6b35] text-[#ff6b35] px-8 py-4 rounded-lg hover:bg-[#ff6b35] hover:text-white transition-colors font-semibold text-lg"
+                  >
+                    Gửi ticket
+                  </button>
                   </div>
                 </div>
               </AnimatedSection>
