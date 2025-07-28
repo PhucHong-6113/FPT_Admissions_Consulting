@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { isAuthenticated } from '@/utils/auth';
 import { SERVICE_URLS } from '../../utils/services';
 
@@ -139,7 +140,13 @@ export default function RequestTicketPage() {
       }
 
       alert('🎉 Ticket đã được gửi thành công!');
-      router.push('/');
+      
+      // Option to view tickets or go home
+      if (confirm('Bạn có muốn xem danh sách ticket của mình không?')) {
+        router.push('/my-tickets');
+      } else {
+        router.push('/');
+      }
     } catch (error) {
       console.error('Error:', error);
       setErrorMessage('❌ Có lỗi xảy ra khi gửi ticket. Vui lòng thử lại!');
@@ -151,9 +158,31 @@ export default function RequestTicketPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-3xl mx-auto px-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-8">📩 Gửi Ticket Hỗ Trợ</h2>
+        {/* Header with Navigation */}
+        <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <h2 className="text-3xl font-bold text-gray-900">📩 Gửi Ticket Hỗ Trợ</h2>
+              <p className="text-gray-600 mt-1">Tạo ticket hỗ trợ mới để được tư vấn viên giải đáp</p>
+            </div>
+            <div className="flex gap-3">
+              <Link 
+                href="/my-tickets"
+                className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors font-semibold text-sm"
+              >
+                📋 Ticket của tôi
+              </Link>
+              <Link 
+                href="/"
+                className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors font-semibold text-sm"
+              >
+                🏠 Về trang chủ
+              </Link>
+            </div>
+          </div>
+        </div>
 
+        <div className="bg-white rounded-2xl shadow-xl p-8">
           {/* Hiển thị lỗi nếu có */}
           {errorMessage && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
