@@ -109,8 +109,9 @@ export default function LoginPage() {
             }
           }
         } catch (e) {
-          // ignore fetch error
+          console.warn('Error fetching token info:', e);
         }
+        
         // Gọi API SelectUserProfile để lấy thông tin hồ sơ người dùng và lưu kèm role
         try {
           const userProfileRes = await fetch(`${SERVICE_URLS.AuthService}/api/v1/User/SelectUserProfile`, {
@@ -126,20 +127,23 @@ export default function LoginPage() {
               // Gộp role vào response
               const fullProfile = { ...userProfile.response, role: userRole };
               localStorage.setItem('user_profile', JSON.stringify(fullProfile));
-              // Điều hướng theo role
-              if (userRole === 'Consultant') {
-                window.location.href = '/consultant';
-                return;
-              }
-              if (userRole === 'Admin') {
-                window.location.href = '/admin';
-                return;
-              }
             }
           }
         } catch (e) {
-          // ignore fetch error
+          console.warn('Error fetching user profile:', e);
         }
+        
+        // Điều hướng theo role - đảm bảo chuyển hướng ngay lập tức
+        if (userRole === 'Consultant') {
+          window.location.href = '/consultant';
+          return;
+        }
+        if (userRole === 'Admin') {
+          window.location.href = '/admin';
+          return;
+        }
+        
+        // Nếu không có role cụ thể, chuyển về trang chủ
         window.location.href = '/';
       } else {
         const errorData = await tokenResponse.json().catch(() => ({}));
