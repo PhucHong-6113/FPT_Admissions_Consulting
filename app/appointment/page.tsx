@@ -190,13 +190,7 @@ export default function AppointmentPage() {
             // Lấy thông tin user hiện tại để gửi đủ các trường
             const currentProfile = userProfile || {};
             const formData = new FormData();
-            formData.append('Email', currentProfile.email || '');
             formData.append('PhoneNumber', phoneInput);
-            formData.append('FirstName', currentProfile.firstName || '');
-            formData.append('LastName', currentProfile.lastName || '');
-            formData.append('DateOfBirth', currentProfile.dateOfBirth || '');
-            formData.append('Gender', currentProfile.gender || '');
-            formData.append('Address', currentProfile.address || '');
             formData.append('AvatarFile', '');
             const res = await fetch(`${SERVICE_URLS.AuthService}/api/v1/user/UpdateUser`, {
                 method: 'PUT',
@@ -208,7 +202,11 @@ export default function AppointmentPage() {
             });
             const data = await res.json();
             if (data && data.success) {
-                const updatedProfile = { ...currentProfile, phoneNumber: phoneInput };
+                // Đảm bảo updatedProfile có đủ các trường của UserProfile
+                const updatedProfile: UserProfile = {
+                    ...(currentProfile as UserProfile),
+                    phoneNumber: phoneInput,
+                };
                 setUserProfile(updatedProfile);
                 if (typeof window !== 'undefined') {
                     localStorage.setItem('user_profile', JSON.stringify(updatedProfile));

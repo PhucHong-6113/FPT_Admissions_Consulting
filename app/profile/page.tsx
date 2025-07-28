@@ -54,6 +54,11 @@ export default function ProfilePage() {
   const [pageNumber, setPageNumber] = useState(1);
   const [pageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
+  // Ticket list state
+  const [ticketList, setTicketList] = useState<any[]>([]);
+  const [isLoadingList, setIsLoadingList] = useState(false);
+  // Chat modal state
+  const [openChatTicket, setOpenChatTicket] = useState<any|null>(null);
 
   useEffect(() => {
     // Check login
@@ -65,6 +70,41 @@ export default function ProfilePage() {
     fetchUserProfile(token);
     fetchAppointments();
   }, [router]);
+
+  // Fetch ticket list when tab is 'ticket'
+  useEffect(() => {
+    if (activeTab === 'ticket') {
+      let sid = userProfileFull?.userId || null;
+      if (!sid && typeof window !== 'undefined') {
+        sid = localStorage.getItem('student_id');
+      }
+      if (sid) {
+        const fetchTickets = async () => {
+          setIsLoadingList(true);
+          try {
+            const res = await fetch(
+              `${SERVICE_URLS.RequestTicketService}/request-tickets?studentId=${sid}`,
+              {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                }
+              }
+            );
+            if (!res.ok) throw new Error('Không thể lấy danh sách ticket');
+            const data = await res.json();
+            setTicketList(Array.isArray(data) ? data : (data.tickets || []));
+          } catch (err) {
+            setTicketList([]);
+          } finally {
+            setIsLoadingList(false);
+          }
+        };
+        fetchTickets();
+      }
+    }
+  }, [activeTab, userProfile]);
 
   const fetchUserProfile = async (token: string) => {
     try {
@@ -260,9 +300,9 @@ export default function ProfilePage() {
                   <span className="flex-1 text-right">
                     {(() => {
                       const gender = userProfileFull.gender;
-                      if (gender === '1' || gender === 1) return 'Nam';
-                      if (gender === '2' || gender === 2) return 'Nữ';
-                      if (gender === '3' || gender === 3) return 'Khác';
+                      if (gender === '1') return 'Nam';
+                      if (gender === '2') return 'Nữ';
+                      if (gender === '3') return 'Khác';
                       return '-';
                     })()}
                   </span>
@@ -340,9 +380,71 @@ export default function ProfilePage() {
             </div>
           )}
           {activeTab === 'ticket' && (
-            <div className="w-full max-w-2xl text-center text-gray-500 py-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Yêu cầu hỗ trợ</h2>
-              <p>Chức năng này sẽ sớm được cập nhật.</p>
+            <div className="w-full max-w-4xl mx-auto mt-4">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">📝 Ticket đã gửi</h2>
+              {isLoadingList ? (
+                <div>Đang tải danh sách...</div>
+              ) : ticketList.length === 0 ? (
+                <div className="text-gray-500">Bạn chưa gửi ticket nào.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm bg-white rounded-xl shadow-lg border border-gray-200">
+                    <thead>
+                      <tr className="bg-gradient-to-r from-[#fff5f2] to-[#ffe3d1]">
+                        <th className="px-6 py-4 text-center font-semibold text-gray-800 text-base">Tiêu đề</th>
+                        <th className="px-6 py-4 text-center font-semibold text-gray-800 text-base">Mô tả</th>
+                        <th className="px-6 py-4 text-center font-semibold text-gray-800 text-base">Mức ưu tiên</th>
+                        <th className="px-6 py-4 text-center font-semibold text-gray-800 text-base">Trạng thái</th>
+                        <th className="px-6 py-4 text-center font-semibold text-gray-800 text-base">Ngày tạo</th>
+                        <th className="px-6 py-4 text-center font-semibold text-gray-800 text-base">Trao đổi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ticketList.map((t, idx) => (
+                        <tr key={t.id || idx} className="border-b last:border-b-0 hover:bg-[#fff5f2]/60 transition">
+                          <td className="px-6 py-4 text-gray-900 font-medium max-w-xs truncate text-center text-base" title={t.title}>{t.title}</td>
+                          <td className="px-6 py-4 text-gray-700 max-w-xs truncate text-center text-base" title={t.description}>{t.description}</td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="inline-block px-3 py-1 rounded-full text-sm font-semibold bg-orange-100 text-orange-700">
+                              {t.priority || t.priorityName}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            {(() => {
+                              const status = t.status || t.statusName || 'Đang xử lý';
+                              if (typeof status === 'string') {
+                                if (status.toLowerCase().includes('hủy') || status.toLowerCase().includes('cancel')) {
+                                  return <span className="inline-block px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">{status}</span>;
+                                }
+                                if (status.toLowerCase().includes('xử lý') || status.toLowerCase().includes('processing')) {
+                                  return <span className="inline-block px-2 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">{status}</span>;
+                                }
+                                if (status.toLowerCase().includes('hoàn thành') || status.toLowerCase().includes('done') || status.toLowerCase().includes('success')) {
+                                  return <span className="inline-block px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">{status}</span>;
+                                }
+                              }
+                              return <span className="inline-block px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">{status}</span>;
+                            })()}
+                          </td>
+                          <td className="px-6 py-4 text-center text-gray-600 text-base">{t.createdAt ? new Date(t.createdAt).toLocaleString() : ''}</td>
+                          <td className="px-6 py-4 text-center">
+                            {Array.isArray(t.chats) && t.chats.length > 0 ? (
+                              <button
+                                className="px-4 py-2 bg-[#ff6b35] text-white rounded-lg hover:bg-[#ff8c42] text-sm font-semibold shadow"
+                                onClick={() => setOpenChatTicket(t)}
+                              >
+                                Xem trao đổi ({t.chats.length})
+                              </button>
+                            ) : (
+                              <span className="text-gray-400 text-sm">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </main>
@@ -412,15 +514,15 @@ export default function ProfilePage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Giới tính</label>
                   <div className="flex gap-4">
                     <label className="flex items-center gap-1">
-                      <input type="radio" name="gender" value="1" checked={editProfile.gender === '1' || editProfile.gender === 1} onChange={e => setEditProfile({...editProfile, gender: e.target.value})} />
+                      <input type="radio" name="gender" value="1" checked={editProfile.gender === '1'} onChange={e => setEditProfile({...editProfile, gender: e.target.value})} />
                       Nam
                     </label>
                     <label className="flex items-center gap-1">
-                      <input type="radio" name="gender" value="2" checked={editProfile.gender === '2' || editProfile.gender === 2} onChange={e => setEditProfile({...editProfile, gender: e.target.value})} />
+                      <input type="radio" name="gender" value="2" checked={editProfile.gender === '2'} onChange={e => setEditProfile({...editProfile, gender: e.target.value})} />
                       Nữ
                     </label>
                     <label className="flex items-center gap-1">
-                      <input type="radio" name="gender" value="3" checked={editProfile.gender === '3' || editProfile.gender === 3} onChange={e => setEditProfile({...editProfile, gender: e.target.value})} />
+                      <input type="radio" name="gender" value="3" checked={editProfile.gender === '3'} onChange={e => setEditProfile({...editProfile, gender: e.target.value})} />
                       Khác
                     </label>
                   </div>
@@ -439,6 +541,46 @@ export default function ProfilePage() {
                   {updateMessage}
                 </div>
               )}
+            </div>
+          </div>
+        )}
+        {/* Modal chat toàn màn hình */}
+        {openChatTicket && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setOpenChatTicket(null)} />
+            <div className="fixed inset-0 bg-white z-10 flex flex-col p-0 sm:p-8 animate-fade-in">
+              <button
+                className="absolute top-6 right-8 bg-[#ff6b35] text-white rounded-full w-12 h-12 flex items-center justify-center text-2xl font-bold shadow-lg hover:bg-[#ff8c42] transition z-20"
+                onClick={() => setOpenChatTicket(null)}
+                title="Đóng"
+              >×</button>
+              <div className="flex-1 flex flex-col items-center justify-start pt-12 sm:pt-16 px-2 sm:px-8">
+                <h3 className="text-3xl font-bold mb-8 text-[#ff6b35] flex items-center gap-3">
+                  <svg className="w-9 h-9 text-[#ff8c42]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17 8h2a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V10a2 2 0 012-2h2"/><path strokeLinecap="round" strokeLinejoin="round" d="M15 3h-6a2 2 0 00-2 2v3a2 2 0 002 2h6a2 2 0 002-2V5a2 2 0 00-2-2z"/></svg>
+                  Trao đổi Ticket: <span className="ml-2 text-gray-800">{openChatTicket.title}</span>
+                </h3>
+                <div className="w-full max-w-4xl mx-auto flex-1 overflow-y-auto space-y-8 bg-white rounded-2xl p-4 sm:p-8 shadow-inner border border-[#ffe3d1]">
+                  {openChatTicket.chats.map((chat: any, i: number) => (
+                    <div key={chat.chatId || i} className={`flex items-start gap-7 p-6 rounded-2xl ${chat.isInternal ? 'bg-[#fff5f2]' : 'bg-[#f0f9ff]'}`}>
+                      <div className="flex-shrink-0 w-20 h-20 rounded-full bg-[#ff6b35]/20 flex items-center justify-center font-bold text-3xl text-[#ff6b35]">
+                        {chat.userId ? chat.userId.slice(0, 2).toUpperCase() : 'U'}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-4 mb-2">
+                          <span className="font-semibold text-gray-800 text-lg">{chat.isInternal ? 'Nội bộ' : 'Khách'}</span>
+                          <span className="text-base text-gray-400">{chat.createdAt ? new Date(chat.createdAt).toLocaleString() : ''}</span>
+                        </div>
+                        <div className="text-gray-700 mt-1 mb-2 break-words text-xl leading-relaxed">{chat.message}</div>
+                        {chat.fileUrl && (
+                          <a href={chat.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-block mt-2">
+                            <img src={chat.fileUrl} alt="file" className="w-72 h-72 object-cover rounded-xl border" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         )}
