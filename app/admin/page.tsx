@@ -99,6 +99,16 @@ export default function AdminDashboard() {
   const [schedulesTotalRecords, setSchedulesTotalRecords] = useState(0);
   const [schedulesTotalPages, setSchedulesTotalPages] = useState(0);
 
+  // Create Counselor Modal states
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createSuccess, setCreateSuccess] = useState<boolean | null>(null);
+  const [formData, setFormData] = useState({
+    email: '',
+    firstName: '',
+    lastName: ''
+  });
+
   useEffect(() => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
     const profile = typeof window !== 'undefined' ? localStorage.getItem('user_profile') : null;
@@ -176,6 +186,90 @@ export default function AdminDashboard() {
       if (token) {
         await fetchConsultantSchedules(token, selectedConsultant.id, newPage);
       }
+    }
+  };
+
+  // Create Counselor handlers
+  const handleOpenCreateModal = () => {
+    setShowCreateModal(true);
+    setCreateSuccess(null);
+    setFormData({
+      email: '',
+      firstName: '',
+      lastName: ''
+    });
+  };
+
+  const handleCloseCreateModal = () => {
+    setShowCreateModal(false);
+    setCreateSuccess(null);
+    setFormData({
+      email: '',
+      firstName: '',
+      lastName: ''
+    });
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleCreateCounselor = async () => {
+    if (!formData.email || !formData.firstName || !formData.lastName) {
+      alert('Vui lòng điền đầy đủ thông tin');
+      return;
+    }
+
+    setCreateLoading(true);
+    const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+    
+    if (!token) {
+      alert('Bạn chưa đăng nhập');
+      setCreateLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${SERVICE_URLS.AuthService}/api/v1/user/InsertCounselor`, {
+        method: 'POST',
+        headers: {
+          'accept': 'application/octet-stream',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          firstName: formData.firstName,
+          lastName: formData.lastName
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setCreateSuccess(true);
+          // Refresh consultants list
+          setTimeout(() => {
+            fetchConsultantsWithPaging(token, consultantsCurrentPage);
+            setTimeout(() => {
+              handleCloseCreateModal();
+            }, 1500);
+          }, 1000);
+        } else {
+          setCreateSuccess(false);
+        }
+      } else {
+        setCreateSuccess(false);
+      }
+    } catch (error) {
+      console.error('Error creating counselor:', error);
+      setCreateSuccess(false);
+    } finally {
+      setCreateLoading(false);
     }
   };
 
@@ -654,8 +748,19 @@ export default function AdminDashboard() {
               <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="text-xl font-semibold text-gray-900">Danh sách tư vấn viên</h3>
-                  <div className="bg-gradient-to-r from-orange-400 to-orange-500 text-white px-4 py-2 rounded-lg shadow-md">
-                    <span className="text-lg font-semibold">Tổng: {consultantsTotalRecords} nhân viên</span>
+                  <div className="flex items-center space-x-4">
+                    <div className="bg-gradient-to-r from-orange-400 to-orange-500 text-white px-4 py-2 rounded-lg shadow-md">
+                      <span className="text-lg font-semibold">Tổng: {consultantsTotalRecords} nhân viên</span>
+                    </div>
+                    <button
+                      onClick={handleOpenCreateModal}
+                      className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-4 py-2 rounded-lg shadow-md transition-all duration-200 hover:scale-105 flex items-center space-x-2"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      <span className="text-lg font-semibold">Tạo Counselor</span>
+                    </button>
                   </div>
                 </div>
                 
@@ -977,6 +1082,145 @@ export default function AdminDashboard() {
           </div>
         )}
       </div>
+
+      {/* Create Counselor Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-8 shadow-2xl max-w-md w-full mx-4 animate-slideIn">
+            <style jsx>{`
+              @keyframes slideIn {
+                from {
+                  opacity: 0;
+                  transform: scale(0.9) translateY(-20px);
+                }
+                to {
+                  opacity: 1;
+                  transform: scale(1) translateY(0);
+                }
+              }
+            `}</style>
+            
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-bold text-gray-900">Tạo Counselor Mới</h3>
+              <button
+                onClick={handleCloseCreateModal}
+                className="text-gray-400 hover:text-gray-600 transition-colors duration-200 hover:scale-110"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {createSuccess === null && (
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                    Email <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#ff6b35] focus:border-transparent"
+                    placeholder="Nhập email"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-2">
+                    Tên <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="firstName"
+                    name="firstName"
+                    value={formData.firstName}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#ff6b35] focus:border-transparent"
+                    placeholder="Nhập tên"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-2">
+                    Họ <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="lastName"
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#ff6b35] focus:border-transparent"
+                    placeholder="Nhập họ"
+                    required
+                  />
+                </div>
+
+                <div className="flex space-x-3 pt-4">
+                  <button
+                    onClick={handleCloseCreateModal}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors duration-200"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    onClick={handleCreateCounselor}
+                    disabled={createLoading}
+                    className={`flex-1 px-4 py-2 bg-[#ff6b35] text-white rounded-md hover:bg-[#ff8c42] transition-colors duration-200 flex items-center justify-center ${
+                      createLoading ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    {createLoading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Đang tạo...
+                      </>
+                    ) : (
+                      'Tạo'
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {createSuccess === true && (
+              <div className="text-center py-8">
+                <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                  <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h4 className="text-lg font-semibold text-gray-900 mb-2">Tạo thành công!</h4>
+                <p className="text-gray-600">Counselor đã được tạo thành công.</p>
+              </div>
+            )}
+
+            {createSuccess === false && (
+              <div className="text-center py-8">
+                <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                  <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </div>
+                <h4 className="text-lg font-semibold text-gray-900 mb-2">Tạo thất bại!</h4>
+                <p className="text-gray-600 mb-4">Có lỗi xảy ra khi tạo counselor.</p>
+                <button
+                  onClick={() => setCreateSuccess(null)}
+                  className="px-4 py-2 bg-[#ff6b35] text-white rounded-md hover:bg-[#ff8c42] transition-colors duration-200"
+                >
+                  Thử lại
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
