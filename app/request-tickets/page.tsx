@@ -24,6 +24,8 @@ export default function RequestTicketPage() {
   const [studentId, setStudentId] = useState<string | null>(null);
   const [createdBy, setCreatedBy] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
+  const [ticketList, setTicketList] = useState<any[]>([]);
+  const [isLoadingList, setIsLoadingList] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -53,6 +55,35 @@ export default function RequestTicketPage() {
     console.log('[DEBUG] user_id:', uid);
   }
 }, []);
+
+  // Fetch ticket list for current user
+  useEffect(() => {
+    if (studentId) {
+      const fetchTickets = async () => {
+        setIsLoadingList(true);
+        try {
+          const res = await fetch(
+            `${SERVICE_URLS.RequestTicketService}/request-tickets?studentId=${studentId}`,
+            {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+              }
+            }
+          );
+          if (!res.ok) throw new Error('Không thể lấy danh sách ticket');
+          const data = await res.json();
+          setTicketList(Array.isArray(data) ? data : (data.tickets || []));
+        } catch (err) {
+          setTicketList([]);
+        } finally {
+          setIsLoadingList(false);
+        }
+      };
+      fetchTickets();
+    }
+  }, [studentId]);
 
 
   const mapPriorityToId = (priority: TicketData['priority']): number => {
