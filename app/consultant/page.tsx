@@ -215,6 +215,40 @@ export default function ConsultantDashboard() {
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
                                 Đã thanh toán
                               </span>
+                              <button
+                                className="mt-2 bg-[#ff6b35] text-white px-3 py-1 rounded hover:bg-[#ff8c42] text-sm"
+                                onClick={async () => {
+                                  const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+                                  if (!token) {
+                                    alert('Bạn chưa đăng nhập.');
+                                    return;
+                                  }
+                                  try {
+                                    const res = await fetch(`${SERVICE_URLS.AppointmentService}/api/v1/appointment/${app.id}/status`, {
+                                      method: 'PATCH',
+                                      headers: {
+                                        'accept': 'application/json',
+                                        'Authorization': `Bearer ${token}`,
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({})
+                                    });
+                                    const data = await res.json();
+                                    if (data && data.success) {
+                                      alert('Cập nhật trạng thái thành công!');
+                                      fetchAppointments(token);
+                                    } else {
+                                      if (data && data.message && data.message.includes('Cannot update status for future appointments')) {
+                                        alert('Không thể cập nhật trạng thái cho lịch hẹn chưa diễn ra.');
+                                      } else {
+                                        alert('Có lỗi xảy ra: ' + (data.message || 'Không xác định'));
+                                      }
+                                    }
+                                  } catch {
+                                    alert('Có lỗi xảy ra khi cập nhật trạng thái.');
+                                  }
+                                }}
+                              >Cập nhật trạng thái</button>
                             </div>
                           ) : (
                             <span className="text-gray-300 text-xs">-</span>
