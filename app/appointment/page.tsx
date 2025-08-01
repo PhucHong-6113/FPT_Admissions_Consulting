@@ -75,6 +75,8 @@ export default function AppointmentPage() {
     const [phoneInput, setPhoneInput] = useState('');
     const [phoneUpdateLoading, setPhoneUpdateLoading] = useState(false);
     const [phoneUpdateError, setPhoneUpdateError] = useState('');
+    const [showWarningModal, setShowWarningModal] = useState(false);
+    const [existingAppointmentDate, setExistingAppointmentDate] = useState<string | null>(null);
     const router = useRouter();
 
     useEffect(() => {
@@ -141,10 +143,59 @@ export default function AppointmentPage() {
         setShowCounselorModal(true);
     };
 
+    const isDateInCurrentWeek = (dateStr: string) => {
+        const date = new Date(dateStr);
+        const now = new Date();
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay() + 1); // Monday
+        startOfWeek.setHours(0,0,0,0);
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6); // Sunday
+        endOfWeek.setHours(23,59,59,999);
+        return date >= startOfWeek && date <= endOfWeek;
+    };
+
     const handleBooking = async () => {
         if (!selectedSlot) return;
+        const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+        if (!token) {
+            alert('Bạn chưa đăng nhập.');
+            return;
+        }
+        // Kiểm tra lịch đã đặt trong tuần hiện tại
+        const page = 1;
+        const pageSize = 10;
+        const res = await fetch(`${SERVICE_URLS.AppointmentService}/api/v1/appointment?pageNumber=${page}&pageSize=${pageSize}`, {
+            method: 'GET',
+            headers: {
+                'accept': 'application/octet-stream',
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+        const data = await res.json();
+        if (data && data.success && data.response && Array.isArray(data.response.items)) {
+            const appointments = data.response.items.filter((item: any) => item.status === 2);
+            const found = appointments.find((item: any) => isDateInCurrentWeek(item.appointmentDate));
+            if (found) {
+                setExistingAppointmentDate(found.appointmentDate);
+                setShowWarningModal(true);
+                return;
+            }
+        }
+        // Nếu không có lịch trong tuần, tiến hành đặt lịch
         setShowBookingModal(false);
-        // Gọi API tạo lịch hẹn và redirect đến checkoutUrl nếu thành công
+        const checkoutUrl = await createAppointment(selectedSlot.scheduleId, 'Đặt lịch tư vấn');
+        if (checkoutUrl) {
+            window.location.href = checkoutUrl;
+        } else {
+            alert('Đặt lịch thất bại. Vui lòng thử lại.');
+        }
+    };
+
+    const handleConfirmBooking = async () => {
+        setShowWarningModal(false);
+        setShowBookingModal(false);
+        if (!selectedSlot) return;
         const checkoutUrl = await createAppointment(selectedSlot.scheduleId, 'Đặt lịch tư vấn');
         if (checkoutUrl) {
             window.location.href = checkoutUrl;
@@ -220,6 +271,37 @@ export default function AppointmentPage() {
         } finally {
             setPhoneUpdateLoading(false);
         }
+    };
+
+    // Thêm hàm kiểm tra và xử lý đặt lịch khi click Đặt lịch ở modal counselor
+    const handleCheckAndShowBooking = async () => {
+        setShowCounselorModal(false);
+        if (!selectedSlot) return;
+        const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+        if (!token) {
+            alert('Bạn chưa đăng nhập.');
+            return;
+        }
+        const page = 1;
+        const pageSize = 10;
+        const res = await fetch(`${SERVICE_URLS.AppointmentService}/api/v1/appointment?pageNumber=${page}&pageSize=${pageSize}`, {
+            method: 'GET',
+            headers: {
+                'accept': 'application/octet-stream',
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+        const data = await res.json();
+        if (data && data.success && data.response && Array.isArray(data.response.items)) {
+            const appointments = data.response.items.filter((item: any) => item.status === 2);
+            const found = appointments.find((item: any) => isDateInCurrentWeek(item.appointmentDate));
+            if (found) {
+                setExistingAppointmentDate(found.appointmentDate);
+                setShowWarningModal(true);
+                return;
+            }
+        }
+        setShowBookingModal(true);
     };
 
     if (isLoading) {
@@ -360,8 +442,9 @@ export default function AppointmentPage() {
 
             {/* Booking Modal */}
             {showBookingModal && selectedSlot && (
-                <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+                <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
+                    <div className="absolute inset-0 backdrop-blur-sm bg-black/20 transition-all duration-300" />
+                    <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md z-10 relative">
                         <div className="text-center mb-6">
                             <div className="w-16 h-16 bg-[#ff6b35] rounded-full flex items-center justify-center mx-auto mb-4 shadow">
                                 <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -423,7 +506,7 @@ export default function AppointmentPage() {
             {/* Modal chi tiết counselor */}
             {showCounselorModal && selectedSlot && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
-                    <div className="absolute inset-0 backdrop-blur-sm bg-transparent transition-all duration-300" onClick={() => { setShowCounselorModal(false); setSelectedSlot(null); }} />
+                    <div className="absolute inset-0 backdrop-blur-sm bg-white/20 transition-all duration-300" onClick={() => { setShowCounselorModal(false); setSelectedSlot(null); }} />
                     <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md z-10 relative">
                         <h2 className="text-xl font-bold mb-4 text-[#ff6b35] flex items-center gap-2">
                             <svg className="w-6 h-6 text-[#ff8c42]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
@@ -448,7 +531,7 @@ export default function AppointmentPage() {
                             {selectedSlot.statusId === ScheduleStatus.Available ? (
                                 <button
                                     className="mt-4 bg-[#ff6b35] text-white px-6 py-2 rounded-lg font-semibold hover:bg-[#ff8c42] transition-colors"
-                                    onClick={() => { setShowCounselorModal(false); setShowBookingModal(true); }}
+                                    onClick={handleCheckAndShowBooking}
                                 >
                                     Đặt lịch
                                 </button>
@@ -490,6 +573,22 @@ export default function AppointmentPage() {
                     </div>
                 </div>
             )}
+
+            {/* Warning Modal */}
+            {showWarningModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    <div className="absolute inset-0 backdrop-blur-sm bg-white/20 transition-all duration-300" />
+                    <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md relative z-10">
+                        <h2 className="text-2xl font-bold text-[#ff6b35] mb-4">Cảnh báo</h2>
+                        <div className="mb-4">Bạn đã tạo cuộc hẹn ngày {existingAppointmentDate ? new Date(existingAppointmentDate).toLocaleDateString('vi-VN') : ''} trong tuần này. Bạn có muốn tiếp tục đặt lịch không?</div>
+                        <div className="flex justify-end gap-2">
+                            <button className="px-4 py-2 rounded bg-gray-200 text-gray-700" onClick={() => setShowWarningModal(false)}>Hủy</button>
+                            <button className="px-4 py-2 rounded bg-[#ff6b35] text-white font-semibold" onClick={handleConfirmBooking}>Tiếp tục</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
+

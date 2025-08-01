@@ -45,6 +45,10 @@ export default function ConsultantDashboard() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [userDetail, setUserDetail] = useState<any | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [modalError, setModalError] = useState("");
 
   useEffect(() => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
@@ -78,6 +82,38 @@ export default function ConsultantDashboard() {
       setError("Có lỗi xảy ra khi tải lịch hẹn.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Hàm gọi API lấy chi tiết user
+  const fetchUserDetail = async (userId: string) => {
+    setModalLoading(true);
+    setModalError("");
+    setUserDetail(null);
+    const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+    if (!token) {
+      setModalError("Bạn chưa đăng nhập.");
+      setModalLoading(false);
+      return;
+    }
+    try {
+      const res = await fetch(`${SERVICE_URLS.AuthService}/api/v1/user/${userId}`, {
+        method: 'GET',
+        headers: {
+          'accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (data && data.success && data.response) {
+        setUserDetail(data.response);
+      } else {
+        setModalError("Không tìm thấy thông tin người dùng.");
+      }
+    } catch {
+      setModalError("Có lỗi xảy ra khi tải thông tin người dùng.");
+    } finally {
+      setModalLoading(false);
     }
   };
 
@@ -171,12 +207,48 @@ export default function ConsultantDashboard() {
                         <td key={dayId} className="p-3 bg-white rounded shadow align-top">
                           {app ? (
                             <div>
-                              <div className="font-semibold text-[#ff6b35]">{app.user.firstName} {app.user.lastName}</div>
+                              <div className="font-semibold text-[#ff6b35] cursor-pointer" onClick={() => {fetchUserDetail(app.user.id); setShowModal(true);}}>
+                                {app.user.firstName} {app.user.lastName}
+                              </div>
                               <div className="text-gray-500 text-xs">{app.user.email}</div>
                               <span className="text-green-600 font-semibold flex items-center gap-1 mt-1">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
                                 Đã thanh toán
                               </span>
+                              <button
+                                className="mt-2 bg-[#ff6b35] text-white px-3 py-1 rounded hover:bg-[#ff8c42] text-sm"
+                                onClick={async () => {
+                                  const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+                                  if (!token) {
+                                    alert('Bạn chưa đăng nhập.');
+                                    return;
+                                  }
+                                  try {
+                                    const res = await fetch(`${SERVICE_URLS.AppointmentService}/api/v1/appointment/${app.id}/status`, {
+                                      method: 'PATCH',
+                                      headers: {
+                                        'accept': 'application/json',
+                                        'Authorization': `Bearer ${token}`,
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({})
+                                    });
+                                    const data = await res.json();
+                                    if (data && data.success) {
+                                      alert('Cập nhật trạng thái thành công!');
+                                      fetchAppointments(token);
+                                    } else {
+                                      if (data && data.message && data.message.includes('Cannot update status for future appointments')) {
+                                        alert('Không thể cập nhật trạng thái cho lịch hẹn chưa diễn ra.');
+                                      } else {
+                                        alert('Có lỗi xảy ra: ' + (data.message || 'Không xác định'));
+                                      }
+                                    }
+                                  } catch {
+                                    alert('Có lỗi xảy ra khi cập nhật trạng thái.');
+                                  }
+                                }}
+                              >Cập nhật trạng thái</button>
                             </div>
                           ) : (
                             <span className="text-gray-300 text-xs">-</span>
@@ -191,6 +263,28 @@ export default function ConsultantDashboard() {
           </div>
         )}
       </div>
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md relative">
+            <button className="absolute top-2 right-2 text-gray-400 hover:text-[#ff6b35] text-xl" onClick={() => setShowModal(false)}>&times;</button>
+            <h2 className="text-2xl font-bold text-[#ff6b35] mb-4">Chi tiết người dùng</h2>
+            {modalLoading ? (
+              <div className="text-center text-gray-500">Đang tải...</div>
+            ) : modalError ? (
+              <div className="text-center text-red-500">{modalError}</div>
+            ) : userDetail ? (
+              <div className="space-y-2">
+                <div><span className="font-semibold">Họ tên:</span> {userDetail.firstName} {userDetail.lastName}</div>
+                <div><span className="font-semibold">Email:</span> {userDetail.email}</div>
+                <div><span className="font-semibold">Số điện thoại:</span> {userDetail.phoneNumber || "Chưa cập nhật"}</div>
+                <div><span className="font-semibold">Ngày sinh:</span> {userDetail.dateOfBirth ? new Date(userDetail.dateOfBirth).toLocaleDateString('vi-VN') : "Chưa cập nhật"}</div>
+                <div><span className="font-semibold">Giới tính:</span> {userDetail.gender === 1 ? "Nam" : userDetail.gender === 2 ? "Nữ" : userDetail.gender === 3 ? "Khác" : "Chưa cập nhật"}</div>
+                <div><span className="font-semibold">Địa chỉ:</span> {userDetail.address || "Chưa cập nhật"}</div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
