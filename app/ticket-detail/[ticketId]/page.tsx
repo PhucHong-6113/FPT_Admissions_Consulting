@@ -46,24 +46,25 @@ export default function TicketDetailPage() {
   const ticketId = params.ticketId as string;
 
   useEffect(() => {
-    if (!isAuthenticated()) {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+    if (!token) {
       router.push('/login');
       return;
     }
     if (ticketId) {
-      fetchTicketDetail();
+      fetchTicketDetail(token);
     }
   }, [router, ticketId]);
 
-  const fetchTicketDetail = async () => {
+  const fetchTicketDetail = async (token: string) => {
     setIsLoading(true);
     setErrorMessage('');
     try {
       const response = await fetch(`${SERVICE_URLS.RequestTicketService}/api/request-tickets/${ticketId}`, {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          'accept': 'application/json',
+          'Authorization': `Bearer ${token}`
         }
       });
 
@@ -127,7 +128,10 @@ export default function TicketDetailPage() {
             <p className="text-gray-600 mb-6">{errorMessage}</p>
             <div className="flex gap-4 justify-center">
               <button 
-                onClick={fetchTicketDetail}
+                onClick={() => {
+                  const token = localStorage.getItem('access_token');
+                  if (token) fetchTicketDetail(token);
+                }}
                 className="bg-orange-500 text-white px-6 py-3 rounded-lg hover:bg-orange-600 transition-colors font-semibold"
               >
                 Thử lại

@@ -30,37 +30,55 @@ export default function MyTicketsPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [testResult, setTestResult] = useState('');
   const router = useRouter();
 
   useEffect(() => {
-    if (!isAuthenticated()) {
+    console.log('[DEBUG] Component mounted, checking authentication...');
+    console.log('[DEBUG] SERVICE_URLS:', SERVICE_URLS);
+    
+    const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+    if (!token) {
+      console.log('[DEBUG] User not authenticated, redirecting to login');
       router.push('/login');
       return;
     }
-    fetchMyTickets();
+    
+    console.log('[DEBUG] User authenticated, fetching tickets...');
+    fetchMyTickets(token);
   }, [router]);
 
-  const fetchMyTickets = async () => {
+  const fetchMyTickets = async (token: string) => {
     setIsLoading(true);
     setErrorMessage('');
     try {
+      console.log('[DEBUG] Fetching tickets from:', `${SERVICE_URLS.RequestTicketService}/api/request-tickets/my-tickets`);
+      console.log('[DEBUG] Access token:', token ? 'Present' : 'Missing');
+      
       const response = await fetch(`${SERVICE_URLS.RequestTicketService}/api/request-tickets/my-tickets`, {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          'accept': 'application/json',
+          'Authorization': `Bearer ${token}`
         }
       });
 
+      console.log('[DEBUG] Response status:', response.status);
+      console.log('[DEBUG] Response headers:', Object.fromEntries(response.headers.entries()));
+
       if (!response.ok) {
-        throw new Error('Không thể tải danh sách ticket');
+        const errorText = await response.text();
+        console.error('[DEBUG] Error response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText || 'Không thể tải danh sách ticket'}`);
       }
 
       const data = await response.json();
+      console.log('[DEBUG] Response data:', data);
       setTickets(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching tickets:', error);
-      setErrorMessage('❌ Có lỗi xảy ra khi tải danh sách ticket');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setErrorMessage(`❌ Có lỗi xảy ra khi tải danh sách ticket: ${errorMessage}`);
       setTickets([]);
     } finally {
       setIsLoading(false);
@@ -90,6 +108,43 @@ export default function MyTicketsPage() {
     return new Date(dateString).toLocaleString('vi-VN');
   };
 
+  // Test backend connectivity
+  const testBackendConnection = async () => {
+    setTestResult('Testing connection...');
+    const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+    const tests = [
+      { name: 'Base URL', url: `${SERVICE_URLS.RequestTicketService}`, needsAuth: false },
+      { name: 'Health Check', url: `${SERVICE_URLS.RequestTicketService}/health`, needsAuth: false },
+      { name: 'My Tickets', url: `${SERVICE_URLS.RequestTicketService}/api/request-tickets/my-tickets`, needsAuth: true },
+      { name: 'All Tickets', url: `${SERVICE_URLS.RequestTicketService}/api/request-tickets`, needsAuth: true }
+    ];
+
+    let results = [];
+    for (const test of tests) {
+      try {
+        console.log(`Testing ${test.name}: ${test.url}`);
+        const headers: any = {
+          'accept': 'application/json'
+        };
+        
+        if (test.needsAuth && token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        const response = await fetch(test.url, {
+          method: 'GET',
+          headers
+        });
+        results.push(`${test.name}: ${response.status} ${response.statusText}`);
+        console.log(`${test.name} - Status: ${response.status}`);
+      } catch (error) {
+        results.push(`${test.name}: Connection failed - ${error}`);
+        console.error(`${test.name} failed:`, error);
+      }
+    }
+    setTestResult(results.join('\n'));
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4">
@@ -101,6 +156,12 @@ export default function MyTicketsPage() {
               <p className="text-gray-600 mt-1">Quản lý và theo dõi các ticket hỗ trợ của bạn</p>
             </div>
             <div className="flex gap-3">
+              <button
+                onClick={testBackendConnection}
+                className="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition-colors font-semibold text-sm"
+              >
+                🔧 Test API
+              </button>
               <Link 
                 href="/request-tickets"
                 className="bg-orange-500 text-white px-6 py-3 rounded-lg hover:bg-orange-600 transition-colors font-semibold"
@@ -117,12 +178,23 @@ export default function MyTicketsPage() {
           </div>
         </div>
 
+        {/* Test Results */}
+        {testResult && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h3 className="font-semibold text-blue-900 mb-2">API Test Results:</h3>
+            <pre className="text-sm text-blue-800 whitespace-pre-wrap">{testResult}</pre>
+          </div>
+        )}
+
         {/* Error Message */}
         {errorMessage && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
             {errorMessage}
             <button 
-              onClick={fetchMyTickets}
+              onClick={() => {
+                const token = localStorage.getItem('access_token');
+                if (token) fetchMyTickets(token);
+              }}
               className="ml-4 text-red-800 hover:text-red-900 font-semibold"
             >
               Thử lại

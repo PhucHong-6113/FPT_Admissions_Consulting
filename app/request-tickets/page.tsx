@@ -63,13 +63,19 @@ export default function RequestTicketPage() {
       const fetchTickets = async () => {
         setIsLoadingList(true);
         try {
+          const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+          
+          if (!token) {
+            throw new Error('No access token found. Please login again.');
+          }
+
           const res = await fetch(
-            `${SERVICE_URLS.RequestTicketService}/request-tickets?studentId=${studentId}`,
+            `${SERVICE_URLS.RequestTicketService}/api/request-tickets?studentId=${studentId}`,
             {
               method: 'GET',
               headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                'accept': 'application/json',
+                'Authorization': `Bearer ${token}`
               }
             }
           );
@@ -124,11 +130,18 @@ export default function RequestTicketPage() {
 
     setIsLoading(true);
     try {
-      const response = await fetch(`${SERVICE_URLS.RequestTicketService}/request-tickets`, {
+      const accessToken = localStorage.getItem('access_token');
+      
+      if (!accessToken) {
+        throw new Error('No access token found. Please login again.');
+      }
+
+      const response = await fetch(`${SERVICE_URLS.RequestTicketService}/api/request-tickets`, {
         method: 'POST',
         headers: {
+          'accept': 'application/json',
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          'Authorization': `Bearer ${accessToken}`
         },
         body: JSON.stringify(payload)
       });

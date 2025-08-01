@@ -38,14 +38,15 @@ export default function ConsultantDashboardPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!isAuthenticated()) {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+    if (!token) {
       router.push('/login');
       return;
     }
-    fetchTickets();
+    fetchTickets(token);
   }, [router]);
 
-  const fetchTickets = async () => {
+  const fetchTickets = async (token: string) => {
     setIsLoading(true);
     setErrorMessage('');
     try {
@@ -53,8 +54,8 @@ export default function ConsultantDashboardPage() {
       const pendingResponse = await fetch(`${SERVICE_URLS.RequestTicketService}/api/request-tickets/pending`, {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          'accept': 'application/json',
+          'Authorization': `Bearer ${token}`
         }
       });
 
@@ -62,8 +63,8 @@ export default function ConsultantDashboardPage() {
       const allResponse = await fetch(`${SERVICE_URLS.RequestTicketService}/api/request-tickets`, {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          'accept': 'application/json',
+          'Authorization': `Bearer ${token}`
         }
       });
 
@@ -92,11 +93,18 @@ export default function ConsultantDashboardPage() {
 
     setIsSubmitting(true);
     try {
+      const accessToken = localStorage.getItem('access_token');
+      
+      if (!accessToken) {
+        throw new Error('No access token found. Please login again.');
+      }
+
       const responseObj = await fetch(`${SERVICE_URLS.RequestTicketService}/api/request-tickets/${ticketId}/respond`, {
         method: 'POST',
         headers: {
+          'accept': 'application/json',
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          'Authorization': `Bearer ${accessToken}`
         },
         body: JSON.stringify({ response })
       });
@@ -108,7 +116,8 @@ export default function ConsultantDashboardPage() {
       alert('✅ Phản hồi đã được gửi thành công!');
       setSelectedTicket(null);
       setResponse('');
-      fetchTickets(); // Refresh the lists
+      const token = localStorage.getItem('access_token');
+      if (token) fetchTickets(token); // Refresh the lists
     } catch (error) {
       console.error('Error responding to ticket:', error);
       alert('❌ Có lỗi xảy ra khi gửi phản hồi');
@@ -190,7 +199,10 @@ export default function ConsultantDashboardPage() {
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
             {errorMessage}
             <button 
-              onClick={fetchTickets}
+              onClick={() => {
+                const token = localStorage.getItem('access_token');
+                if (token) fetchTickets(token);
+              }}
               className="ml-4 text-red-800 hover:text-red-900 font-semibold"
             >
               Thử lại
